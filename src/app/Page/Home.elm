@@ -1,10 +1,11 @@
-port module Page.Home exposing (Model, Msg, defaultModel, linkResponse, update, view)
+port module Page.Home exposing (Model, Msg, defaultModel, linkResponse, subscriptions, update, view)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (id)
 import Html.Events exposing (onClick)
+import Http
 import Json.Decode as Decode
-import Link exposing (LinkResponse(..))
+import Link exposing (LinkResponse(..), linkResponseDecoder)
 import Model exposing (Account, ApiEnvironment(..), User)
 import Session exposing (Session(..))
 
@@ -12,6 +13,8 @@ import Session exposing (Session(..))
 type Msg
     = NoOp
     | StartLink
+    | LinkResponseMsg (Result Decode.Error LinkResponse)
+    | HandleItemLink (Result Http.Error Session.Item)
 
 
 defaultUser =
@@ -50,6 +53,42 @@ update msg model =
         StartLink ->
             ( model, plaidLink "StartLink" )
 
+        LinkResponseMsg response ->
+            let
+                _ =
+                    Debug.log "Response" response
+
+                token =
+                    Session.accessToken model.session
+            in
+            case response of
+                Ok linkData ->
+                    case linkData of
+                        LinkSuccess link ->
+                            ( model
+                            , Session.linkItemToUser HandleItemLink token link.publicToken
+                            )
+
+                        LinkError errors ->
+                            -- TODO: graceful error handling
+                            ( model, Cmd.none )
+
+                Err _ ->
+                    -- TODO: graceful error handling
+                    ( model, Cmd.none )
+
+        HandleItemLink response ->
+            case response of
+                Ok item ->
+                    ( { model
+                        | session = Session.addItemToUser model.session item
+                      }
+                    , Cmd.none
+                    )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -71,3 +110,11 @@ port plaidLink : String -> Cmd msg
 
 
 port linkResponse : (Decode.Value -> msg) -> Sub msg
+
+
+subscriptions : Sub Msg
+subscriptions =
+    linkResponse
+        (\value ->
+            LinkResponseMsg (Decode.decodeValue linkResponseDecoder value)
+        )

@@ -46,8 +46,6 @@ type Msg
     | GotSession Navigation.Key String (Result Http.Error Session.User)
     | GotAuthMsg Auth.Msg
     | GotHomeMsg Home.Msg
-    | LinkResponseMsg (Result Decode.Error LinkResponse)
-    | HandleItemLink (Result Http.Error Session.Item)
 
 
 init : Maybe String -> Url -> Navigation.Key -> ( Model, Cmd Msg )
@@ -205,43 +203,6 @@ readyUpdate msg model navKey =
                 External url ->
                     ( Ready model, Navigation.load url )
 
-        ( LinkResponseMsg response, _ ) ->
-            let
-                _ =
-                    Debug.log "Response" response
-
-                token =
-                    Session.accessToken model.session
-            in
-            case response of
-                Ok linkData ->
-                    case linkData of
-                        LinkSuccess link ->
-                            ( Ready model
-                            , Session.linkItemToUser HandleItemLink token link.publicToken
-                            )
-
-                        LinkError errors ->
-                            -- TODO: graceful error handling
-                            ( Ready model, Cmd.none )
-
-                Err _ ->
-                    -- TODO: graceful error handling
-                    ( Ready model, Cmd.none )
-
-        ( HandleItemLink response, _ ) ->
-            case response of
-                Ok item ->
-                    ( Ready
-                        { model
-                            | session = Session.addItemToUser model.session item
-                        }
-                    , Cmd.none
-                    )
-
-                Err _ ->
-                    ( Ready model, Cmd.none )
-
         -- The following do nothing
         ( NoOp, _ ) ->
             ( Ready model, Cmd.none )
@@ -317,10 +278,9 @@ view model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Home.linkResponse
-        (\value ->
-            LinkResponseMsg (Decode.decodeValue linkResponseDecoder value)
-        )
+    Sub.batch
+        [ Home.subscriptions |> Sub.map GotHomeMsg
+        ]
 
 
 main : Program (Maybe String) Model Msg
