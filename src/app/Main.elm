@@ -10,7 +10,6 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Link exposing (Link, LinkResponse(..), linkResponseDecoder)
 import LocalStorage as Storage
-import Model exposing (..)
 import Page.Auth as Auth
 import Page.Home as Home
 import Routing exposing (..)
@@ -23,7 +22,7 @@ import Url exposing (Url)
 
 
 type Model
-    = Loading
+    = Loading Navigation.Key
     | Ready AppModel
 
 
@@ -43,7 +42,7 @@ type Msg
     = NoOp
     | ChangedUrl Url
     | ClickedLink UrlRequest
-    | GotSession Navigation.Key String (Result Http.Error Session.User)
+    | GotSession String (Result Http.Error Session.User)
     | GotAuthMsg Auth.Msg
     | GotHomeMsg Home.Msg
 
@@ -65,8 +64,8 @@ init accessToken url key =
             )
 
         Just token ->
-            ( Loading
-            , getSession (GotSession key token) token
+            ( Loading key
+            , getSession (GotSession token) token
             )
 
 
@@ -104,9 +103,9 @@ pageModelSession pageModel =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case model of
-        Loading ->
+        Loading key ->
             case msg of
-                GotSession key token result ->
+                GotSession token result ->
                     let
                         guestSession =
                             Guest key
@@ -115,7 +114,11 @@ update msg model =
                         Ok user ->
                             let
                                 authSession =
-                                    LoggedIn key token user
+                                    LoggedIn key
+                                        { accessToken = token
+                                        , user = user
+                                        , accounts = []
+                                        }
 
                                 appModel =
                                     { currentRoute = DashboardRoute
@@ -207,7 +210,7 @@ readyUpdate msg model navKey =
         ( NoOp, _ ) ->
             ( Ready model, Cmd.none )
 
-        ( GotSession _ _ _, _ ) ->
+        ( GotSession _ _, _ ) ->
             ( Ready model, Cmd.none )
 
         ( GotAuthMsg _, Home _ ) ->
@@ -255,7 +258,7 @@ navbarView route =
 bodyView : Model -> Html Msg
 bodyView model =
     case model of
-        Loading ->
+        Loading _ ->
             div [] [ text "Loading..." ]
 
         Ready appModel ->

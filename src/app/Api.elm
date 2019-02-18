@@ -1,7 +1,14 @@
-module Api exposing (Method(..), RequestOptions, methodString, request)
+module Api exposing (Method(..), ApiEnvironment(..), RequestOptions, methodString, request)
 
 import Http
 import Json.Decode as Decode exposing (field, int, string)
+
+type ApiEnvironment
+    = Sandbox
+    | Development
+    | Production
+
+
 
 
 type alias RequestOptions msg =

@@ -1,12 +1,12 @@
 port module Page.Home exposing (Model, Msg, defaultModel, linkResponse, subscriptions, update, view)
 
+import Api exposing (ApiEnvironment(..))
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (id)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import Link exposing (LinkResponse(..), linkResponseDecoder)
-import Model exposing (Account, ApiEnvironment(..), User)
 import Session exposing (Session(..))
 
 
@@ -26,19 +26,15 @@ defaultUser =
 
 
 defaultModel session =
-    { user = defaultUser
-    , environment = Sandbox
+    { environment = Sandbox
     , linkResponse = LinkError []
-    , accounts = []
     , session = session
     }
 
 
 type alias Model =
-    { user : User
-    , environment : ApiEnvironment
+    { environment : ApiEnvironment
     , linkResponse : LinkResponse
-    , accounts : List Account
     , session : Session
     }
 
@@ -99,11 +95,16 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ text ("Welcome, " ++ model.user.firstName ++ " " ++ model.user.lastName)
-        , button [ id "link-button", onClick StartLink ]
-            [ text "Add Account" ]
-        ]
+    case model.session of
+        Guest _ ->
+            div [] [ text "Guest Home" ]
+
+        LoggedIn _ data ->
+            div []
+                [ text ("Welcome, " ++ data.user.firstName ++ " " ++ data.user.lastName)
+                , button [ id "link-button", onClick StartLink ]
+                    [ text "Add Account" ]
+                ]
 
 
 port plaidLink : String -> Cmd msg

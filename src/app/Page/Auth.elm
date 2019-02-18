@@ -9,7 +9,6 @@ import Json.Decode as Decode exposing (field, int, string)
 import Json.Encode as Encode
 import Link exposing (Link)
 import LocalStorage as Storage
-import Model exposing (AppModel, GuestModel)
 import Routing exposing (Route(..), routePath)
 import Session exposing (Session(..), SessionData, decoder, navKey)
 
@@ -86,8 +85,15 @@ update msg model =
                         key =
                             navKey model.session
 
+                        newSession =
+                            LoggedIn key
+                                { accessToken = loginResponse.accessToken
+                                , user = loginResponse.user
+                                , accounts = []
+                                }
+
                         newModel =
-                            { model | session = LoggedIn key loginResponse.accessToken loginResponse.user }
+                            { model | session = newSession }
                     in
                     ( newModel
                     , Cmd.batch
