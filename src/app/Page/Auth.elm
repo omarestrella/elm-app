@@ -1,9 +1,9 @@
-module Page.Auth exposing (LoginForm, Model, Msg(..), RegistrationForm, defaultModel, login, loginFormView, register, registerFormView, update, updateLoginForm, updateRegistrationForm, view)
+module Page.Auth exposing (Model, Msg(..), defaultModel, update, view)
 
 import Api exposing (Method(..))
-import Html exposing (Html, button, div, input, label, text)
-import Html.Attributes exposing (type_)
-import Html.Events exposing (onInput, onSubmit)
+import Html.Styled exposing (Html, button, div, form, input, label, text)
+import Html.Styled.Attributes exposing (type_, value)
+import Html.Styled.Events exposing (onInput, onSubmit)
 import Http
 import Json.Decode as Decode exposing (field, int, string)
 import Json.Encode as Encode
@@ -22,22 +22,30 @@ type Msg
     | Register RegistrationForm
     | GotLogin (Result Http.Error LoginResponse)
     | GotRegister (Result Http.Error String)
-    | EnteredLoginEmail String
-    | EnteredLoginPassword String
-    | EnteredRegistrationEmail String
-    | EnteredRegistrationPassword String
-    | EnteredRegistrationFirstName String
-    | EnteredRegistrationLastName String
+    | SetRegistrationField RegistrationFormField String
+    | SetLoginField LoginFormField String
+
+
+type LoginFormField
+    = LoginEmail
+    | LoginPassword
+
+
+type RegistrationFormField
+    = RegistrationEmail
+    | RegistrationPassword
+    | RegistrationFirstName
+    | RegistrationLastName
 
 
 type alias Model =
-    { loginForm : LoginForm
+    { loginForm : LoginFormData
     , registrationForm : RegistrationForm
     , session : Session
     }
 
 
-type alias LoginForm =
+type alias LoginFormData =
     { email : String
     , password : String
     }
@@ -116,23 +124,27 @@ update msg model =
             in
             ( model, Cmd.none )
 
-        EnteredLoginEmail value ->
-            updateLoginForm (\form -> { form | email = value }) model
+        SetRegistrationField field value ->
+            case field of
+                RegistrationEmail ->
+                    updateRegistrationForm (\form -> { form | email = value }) model
 
-        EnteredLoginPassword value ->
-            updateLoginForm (\form -> { form | password = value }) model
+                RegistrationPassword ->
+                    updateRegistrationForm (\form -> { form | password = value }) model
 
-        EnteredRegistrationEmail value ->
-            updateRegistrationForm (\form -> { form | email = value }) model
+                RegistrationFirstName ->
+                    updateRegistrationForm (\form -> { form | firstName = value }) model
 
-        EnteredRegistrationPassword value ->
-            updateRegistrationForm (\form -> { form | password = value }) model
+                RegistrationLastName ->
+                    updateRegistrationForm (\form -> { form | lastName = value }) model
 
-        EnteredRegistrationFirstName value ->
-            updateRegistrationForm (\form -> { form | firstName = value }) model
+        SetLoginField field value ->
+            case field of
+                LoginEmail ->
+                    updateLoginForm (\form -> { form | email = value }) model
 
-        EnteredRegistrationLastName value ->
-            updateRegistrationForm (\form -> { form | lastName = value }) model
+                LoginPassword ->
+                    updateLoginForm (\form -> { form | password = value }) model
 
 
 updateRegistrationForm : (RegistrationForm -> RegistrationForm) -> Model -> ( Model, Cmd Msg )
@@ -140,7 +152,7 @@ updateRegistrationForm transformer model =
     ( { model | registrationForm = transformer model.registrationForm }, Cmd.none )
 
 
-updateLoginForm : (LoginForm -> LoginForm) -> Model -> ( Model, Cmd Msg )
+updateLoginForm : (LoginFormData -> LoginFormData) -> Model -> ( Model, Cmd Msg )
 updateLoginForm transformer model =
     ( { model | loginForm = transformer model.loginForm }, Cmd.none )
 
@@ -185,19 +197,24 @@ register form =
 -- View
 
 
-loginFormView : LoginForm -> Html Msg
+loginFormView : LoginFormData -> Html Msg
 loginFormView loginForm =
-    Html.form [ onSubmit (Login loginForm.email loginForm.password) ]
+    form [ onSubmit (Login loginForm.email loginForm.password) ]
         [ div []
             [ label [] [ text "email" ]
             , input
-                [ onInput EnteredLoginEmail ]
+                [ onInput (SetLoginField LoginEmail)
+                , value loginForm.email
+                ]
                 []
             ]
         , div []
             [ label [] [ text "password" ]
             , input
-                [ type_ "password", onInput EnteredLoginPassword ]
+                [ type_ "password"
+                , onInput (SetLoginField LoginPassword)
+                , value loginForm.password
+                ]
                 []
             ]
         , button []
@@ -206,30 +223,30 @@ loginFormView loginForm =
 
 
 registerFormView : RegistrationForm -> Html Msg
-registerFormView form =
-    Html.form [ onSubmit (Register form) ]
+registerFormView registrationForm =
+    form [ onSubmit (Register registrationForm) ]
         [ div []
             [ label [] [ text "email" ]
-            , input [ onInput EnteredRegistrationEmail ] []
+            , input [ onInput (SetRegistrationField RegistrationEmail) ] []
             ]
         , div []
             [ label [] [ text "password" ]
             , input
                 [ type_ "password"
-                , onInput EnteredRegistrationPassword
+                , onInput (SetRegistrationField RegistrationPassword)
                 ]
                 []
             ]
         , div []
             [ label [] [ text "first name" ]
             , input
-                [ onInput EnteredRegistrationFirstName ]
+                [ onInput (SetRegistrationField RegistrationFirstName) ]
                 []
             ]
         , div []
             [ label [] [ text "last name" ]
             , input
-                [ onInput EnteredRegistrationLastName ]
+                [ onInput (SetRegistrationField RegistrationLastName) ]
                 []
             ]
         , button []

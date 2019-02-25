@@ -2,9 +2,9 @@ port module Main exposing (Model, Msg(..), init, main, subscriptions, update, up
 
 import Browser exposing (Document, UrlRequest(..))
 import Browser.Navigation as Navigation
-import Html exposing (Html, a, button, div, form, h1, img, input, label, text)
-import Html.Attributes exposing (href, id, src, type_)
-import Html.Events exposing (onClick, onSubmit)
+import Html.Styled exposing (Html, a, button, div, form, h1, img, input, label, map, text, toUnstyled)
+import Html.Styled.Attributes exposing (href, id, src, type_)
+import Html.Styled.Events exposing (onClick, onSubmit)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -43,6 +43,7 @@ type Msg
     | ChangedUrl Url
     | ClickedLink UrlRequest
     | GotSession String (Result Http.Error Session.User)
+    | GotAccounts (Result Http.Error (List Session.Account))
     | GotAuthMsg Auth.Msg
     | GotHomeMsg Home.Msg
 
@@ -125,11 +126,15 @@ update msg model =
                                     , pageModel = Home (Home.defaultModel authSession)
                                     , session = authSession
                                     }
+
+                                accountTokens =
+                                    List.map .accessToken user.items
                             in
                             ( Ready appModel
                             , Cmd.batch
                                 [ Routing.routeTo DashboardRoute authSession
                                 , Storage.set "accessToken" token
+                                , Session.loadAccounts GotAccounts token accountTokens
                                 ]
                             )
 
@@ -206,11 +211,26 @@ readyUpdate msg model navKey =
                 External url ->
                     ( Ready model, Navigation.load url )
 
+        ( GotAccounts response, Home homeModel ) ->
+            case response of
+                Ok accounts ->
+                    let
+                        pageModel =
+                            { homeModel | session = Session.addAccountsToSession homeModel.session accounts }
+                    in
+                    ( Ready { model | pageModel = Home pageModel }, Cmd.none )
+
+                Err _ ->
+                    ( Ready model, Cmd.none )
+
         -- The following do nothing
         ( NoOp, _ ) ->
             ( Ready model, Cmd.none )
 
         ( GotSession _ _, _ ) ->
+            ( Ready model, Cmd.none )
+
+        ( GotAccounts response, _ ) ->
             ( Ready model, Cmd.none )
 
         ( GotAuthMsg _, Home _ ) ->
@@ -239,10 +259,12 @@ pageView : AppModel -> Html Msg
 pageView model =
     case model.pageModel of
         Auth authModel ->
-            Auth.view authModel |> Html.map GotAuthMsg
+            Auth.view authModel
+                |> map GotAuthMsg
 
         Home homeModel ->
-            Home.view homeModel |> Html.map GotHomeMsg
+            Home.view homeModel
+                |> map GotHomeMsg
 
 
 navbarView : Route -> Html Msg
@@ -271,7 +293,7 @@ bodyView model =
 view : Model -> Browser.Document Msg
 view model =
     { title = "Budget"
-    , body = [ bodyView model ]
+    , body = [ toUnstyled <| bodyView model ]
     }
 
 

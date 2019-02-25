@@ -1,4 +1,4 @@
-module Session exposing (Item, Session(..), SessionData, User, accessToken, addItemToUser, decoder, encode, getSession, linkItemToUser, navKey, userDecoder)
+module Session exposing (Account, Item, Session(..), SessionData, User, accessToken, addAccountsToSession, addItemToUser, decoder, encode, getSession, linkItemToUser, loadAccounts, navKey, userDecoder)
 
 import Api exposing (Method(..))
 import Browser.Navigation as Navigation
@@ -6,6 +6,7 @@ import Http
 import Json.Decode as Decode exposing (field, int, list, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required)
 import Json.Encode as Encode
+import Url.Builder as Builder exposing (Root(..))
 
 
 type Session
@@ -42,9 +43,10 @@ type alias Account =
     , balances : Maybe Balance
     , name : String
     , mask : String
-    , officialName : String
+    , officialName : Maybe String
     , type_ : String
     , subtype : String
+    , institutionName: String
     }
 
 
@@ -74,6 +76,16 @@ addItemToUser session item =
                     { user | items = user.items ++ [ item ] }
             in
             LoggedIn key { sessionData | user = user }
+
+
+addAccountsToSession : Session -> List Account -> Session
+addAccountsToSession session accounts =
+    case session of
+        Guest _ ->
+            session
+
+        LoggedIn key sessionData ->
+            LoggedIn key { sessionData | accounts = sessionData.accounts ++ accounts }
 
 
 navKey : Session -> Navigation.Key
@@ -121,6 +133,21 @@ linkItemToUser msg token publicToken =
         , method = POST
         , body = Just (Http.jsonBody body)
         , handler = Http.expectJson msg itemDecoder
+        }
+
+
+loadAccounts : (Result Http.Error (List Account) -> msg) -> String -> List String -> Cmd msg
+loadAccounts msg token accessTokens =
+    let
+        url =
+            Builder.absolute [ "accounts" ] (List.map (Builder.string "accessToken") accessTokens)
+    in
+    Api.request
+        { url = url
+        , accessToken = Just token
+        , method = GET
+        , body = Nothing
+        , handler = Http.expectJson msg (Decode.list accountDecoder)
         }
 
 
@@ -194,9 +221,10 @@ accountDecoder =
         |> optional "balances" (Decode.maybe balanceDecoder) Nothing
         |> required "name" Decode.string
         |> required "mask" Decode.string
-        |> required "official_name" Decode.string
+        |> optional "official_name" (Decode.maybe Decode.string) Nothing
         |> required "type" Decode.string
         |> required "subtype" Decode.string
+        |> required "institution_name" Decode.string
 
 
 decoder : Decode.Decoder User

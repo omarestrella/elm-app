@@ -1,13 +1,15 @@
 port module Page.Home exposing (Model, Msg, defaultModel, linkResponse, subscriptions, update, view)
 
 import Api exposing (ApiEnvironment(..))
-import Html exposing (Html, button, div, text)
-import Html.Attributes exposing (id)
-import Html.Events exposing (onClick)
+import Component.Button as Button
+import Html.Styled exposing (Html, div, li, text, ul)
+import Html.Styled.Attributes exposing (css, id)
+import Html.Styled.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import Link exposing (LinkResponse(..), linkResponseDecoder)
 import Session exposing (Session(..))
+import Style exposing (accountsList, homeContainer)
 
 
 type Msg
@@ -93,17 +95,31 @@ update msg model =
 -- View
 
 
+accountsPane : List Session.Account -> Html Msg
+accountsPane accounts =
+    div []
+        [ Button.primary "Add account" StartLink
+        , div [ css accountsList ] <|
+            List.map
+                (\account ->
+                    div []
+                        [ text account.name
+                        , text <| "(" ++ account.institutionName ++ ")"
+                        ]
+                )
+                accounts
+        ]
+
+
 view : Model -> Html Msg
 view model =
     case model.session of
         Guest _ ->
-            div [] [ text "Guest Home" ]
+            text "Guest Home"
 
         LoggedIn _ data ->
-            div []
-                [ text ("Welcome, " ++ data.user.firstName ++ " " ++ data.user.lastName)
-                , button [ id "link-button", onClick StartLink ]
-                    [ text "Add Account" ]
+            div [ css homeContainer ]
+                [ accountsPane data.accounts
                 ]
 
 
