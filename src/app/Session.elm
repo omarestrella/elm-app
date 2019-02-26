@@ -150,7 +150,7 @@ loadAccounts : (Result Http.Error (List Account) -> msg) -> String -> List Strin
 loadAccounts msg token accessTokens =
     let
         url =
-            Builder.absolute [ "accounts" ] (List.map (Builder.string "accessToken") accessTokens)
+            Api.accessTokensUrl accessTokens "accounts"
     in
     Api.request
         { url = url

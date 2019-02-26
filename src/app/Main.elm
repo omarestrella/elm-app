@@ -101,6 +101,22 @@ pageModelSession pageModel =
 ---- UPDATE ----
 
 
+routeHandler : Route -> ( Route, Maybe Msg )
+routeHandler route =
+    case route of
+        DashboardRoute ->
+            ( DashboardRoute, Just (GotDashboardMsg Dashboard.routeHandler) )
+
+        AuthRoute ->
+            ( AuthRoute, Nothing )
+
+        AccountDetailRoute id ->
+            ( AccountDetailRoute id, Nothing )
+
+        NotFoundRoute ->
+            ( NotFoundRoute, Nothing )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case model of
@@ -249,22 +265,6 @@ updateWith toModel toMsg model ( subModel, subCmd ) =
     ( Ready { model | pageModel = pageModel, session = pageModelSession pageModel }
     , Cmd.map toMsg subCmd
     )
-
-
-routeHandler : Route -> ( Route, Maybe Msg )
-routeHandler route =
-    case route of
-        DashboardRoute ->
-            ( DashboardRoute, Just (GotDashboardMsg Dashboard.routeHandler) )
-
-        AuthRoute ->
-            ( AuthRoute, Nothing )
-
-        AccountDetailRoute id ->
-            ( AccountDetailRoute id, Nothing )
-
-        NotFoundRoute ->
-            ( NotFoundRoute, Nothing )
 
 
 

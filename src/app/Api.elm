@@ -1,7 +1,8 @@
-module Api exposing (ApiEnvironment(..), Method(..), RequestOptions, methodString, request)
+module Api exposing (ApiEnvironment(..), Method(..), RequestOptions, accessTokensUrl, methodString, request)
 
 import Http
 import Json.Decode as Decode exposing (field, int, string)
+import Url.Builder as Builder
 
 
 type ApiEnvironment
@@ -29,6 +30,11 @@ type Method
 
 
 -- Utility
+
+
+accessTokensUrl : List String -> String -> String
+accessTokensUrl tokens base =
+    Builder.absolute [ base ] (List.map (Builder.string "accessToken") tokens)
 
 
 methodString : Method -> String

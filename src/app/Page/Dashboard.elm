@@ -1,12 +1,13 @@
 port module Page.Dashboard exposing (Model, Msg, defaultModel, linkResponse, routeHandler, subscriptions, update, view)
 
-import Api exposing (ApiEnvironment(..))
+import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
-import Html.Styled exposing (Html, div, li, text, ul)
+import Html.Styled exposing (Html, div, li, span, text, ul)
 import Html.Styled.Attributes exposing (css, id)
 import Html.Styled.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
+import Json.Decode.Pipeline exposing (hardcoded, optional, required)
 import Link exposing (LinkResponse(..), linkResponseDecoder)
 import Session exposing (Session(..))
 import Style exposing (accountsList, homeContainer)
@@ -17,8 +18,9 @@ type Msg
     | StartLink
     | LinkResponseMsg (Result Decode.Error LinkResponse)
     | HandleItemLink (Result Http.Error Session.Item)
-    | LoadAccounts
+    | LoadData
     | GotAccounts (Result Http.Error (List Session.Account))
+    | GotTransactions (Result Http.Error (List Transaction))
 
 
 defaultUser =
@@ -33,6 +35,7 @@ defaultModel session =
     { environment = Sandbox
     , linkResponse = LinkError []
     , session = session
+    , transactions = []
     }
 
 
@@ -40,7 +43,27 @@ type alias Model =
     { environment : ApiEnvironment
     , linkResponse : LinkResponse
     , session : Session
+    , transactions : List Transaction
     }
+
+
+type alias Transaction =
+    { amount : Float
+    , categories : List String
+    , date : String
+    , name : String
+    , pending : Bool
+    }
+
+
+transactionDecoder : Decode.Decoder Transaction
+transactionDecoder =
+    Decode.succeed Transaction
+        |> required "amount" Decode.float
+        |> required "category" (Decode.list Decode.string)
+        |> required "date" Decode.string
+        |> required "name" Decode.string
+        |> required "pending" Decode.bool
 
 
 
@@ -49,7 +72,7 @@ type alias Model =
 
 routeHandler : Msg
 routeHandler =
-    LoadAccounts
+    LoadData
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -94,7 +117,7 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
-        LoadAccounts ->
+        LoadData ->
             let
                 token =
                     Session.accessToken model.session
@@ -102,7 +125,12 @@ update msg model =
                 accountTokens =
                     Session.accountTokens model.session
             in
-            ( model, Session.loadAccounts GotAccounts token accountTokens )
+            ( model
+            , Cmd.batch
+                [ Session.loadAccounts GotAccounts token accountTokens
+                , loadTransactions token accountTokens
+                ]
+            )
 
         GotAccounts response ->
             case response of
@@ -116,8 +144,31 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
+        GotTransactions response ->
+            case response of
+                Ok transactions ->
+                    ( { model | transactions = transactions }, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
+
+
+loadTransactions : String -> List String -> Cmd Msg
+loadTransactions token accessTokens =
+    let
+        url =
+            Api.accessTokensUrl accessTokens "transactions"
+    in
+    Api.request
+        { url = url
+        , accessToken = Just token
+        , method = GET
+        , body = Nothing
+        , handler = Http.expectJson GotTransactions (Decode.list transactionDecoder)
+        }
 
 
 
@@ -140,6 +191,19 @@ accountsPane accounts =
         ]
 
 
+transactionsPane : List Transaction -> Html Msg
+transactionsPane transactions =
+    div [] <|
+        List.map
+            (\transaction ->
+                div []
+                    [ span [] [ text transaction.name ]
+                    , span [] [ text (String.fromFloat transaction.amount) ]
+                    ]
+            )
+            transactions
+
+
 view : Model -> Html Msg
 view model =
     case model.session of
@@ -149,6 +213,7 @@ view model =
         LoggedIn _ data ->
             div [ css homeContainer ]
                 [ accountsPane data.accounts
+                , transactionsPane model.transactions
                 ]
 
 
