@@ -1,6 +1,9 @@
-module Routing exposing (Route(..), extractRoute, parseRoute, routePath, routeTo)
+module Routing exposing (Route(..), extractRoute, parseRoute, routeLink, routePath, routeTo)
 
 import Browser.Navigation as Navigation
+import Html.Styled exposing (Html, a, text)
+import Html.Styled.Attributes exposing (href)
+import Html.Styled.Events exposing (onClick)
 import Session exposing (Session, navKey)
 import Url exposing (Url)
 import Url.Parser as Parser exposing ((</>), Parser, int, map, oneOf, parse, s, top)
@@ -15,7 +18,19 @@ type Route
 
 routeTo : Route -> Session -> Cmd msg
 routeTo route session =
-    Navigation.pushUrl (navKey session) (routePath DashboardRoute)
+    Navigation.pushUrl (navKey session) (routePath route)
+
+
+routeLink : String -> ( Route, Maybe msg ) -> Html msg
+routeLink text_ ( route, handler ) =
+    case handler of
+        Nothing ->
+            a [ href (routePath route) ]
+                [ text text_ ]
+
+        Just clickMsg ->
+            a [ href (routePath route), onClick clickMsg ]
+                [ text text_ ]
 
 
 routePath : Route -> String

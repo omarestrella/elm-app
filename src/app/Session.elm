@@ -1,4 +1,4 @@
-module Session exposing (Account, Item, Session(..), SessionData, User, accessToken, addAccountsToSession, addItemToUser, decoder, encode, getSession, linkItemToUser, loadAccounts, navKey, userDecoder)
+module Session exposing (Account, Item, Session(..), SessionData, User, accessToken, accountTokens, addAccountsToSession, addItemToUser, decoder, encode, getSession, linkItemToUser, loadAccounts, navKey, userDecoder)
 
 import Api exposing (Method(..))
 import Browser.Navigation as Navigation
@@ -46,7 +46,7 @@ type alias Account =
     , officialName : Maybe String
     , type_ : String
     , subtype : String
-    , institutionName: String
+    , institutionName : String
     }
 
 
@@ -106,6 +106,16 @@ accessToken session =
 
         LoggedIn _ data ->
             data.accessToken
+
+
+accountTokens : Session -> List String
+accountTokens session =
+    case session of
+        Guest _ ->
+            []
+
+        LoggedIn _ data ->
+            List.map .accessToken data.user.items
 
 
 getSession : (Result Http.Error User -> msg) -> String -> Cmd msg

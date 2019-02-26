@@ -11,7 +11,7 @@ import Json.Encode as Encode
 import Link exposing (Link, LinkResponse(..), linkResponseDecoder)
 import LocalStorage as Storage
 import Page.Auth as Auth
-import Page.Home as Home
+import Page.Dashboard as Dashboard
 import Routing exposing (..)
 import Session exposing (Session(..), SessionData, getSession)
 import Url exposing (Url)
@@ -35,7 +35,7 @@ type alias AppModel =
 
 type PageModel
     = Auth Auth.Model
-    | Home Home.Model
+    | Dashboard Dashboard.Model
 
 
 type Msg
@@ -45,7 +45,7 @@ type Msg
     | GotSession String (Result Http.Error Session.User)
     | GotAccounts (Result Http.Error (List Session.Account))
     | GotAuthMsg Auth.Msg
-    | GotHomeMsg Home.Msg
+    | GotDashboardMsg Dashboard.Msg
 
 
 init : Maybe String -> Url -> Navigation.Key -> ( Model, Cmd Msg )
@@ -81,7 +81,7 @@ defaultPageModel session route =
             Auth (Auth.defaultModel session)
 
         DashboardRoute ->
-            Home (Home.defaultModel session)
+            Dashboard (Dashboard.defaultModel session)
 
         _ ->
             Auth (Auth.defaultModel session)
@@ -93,7 +93,7 @@ pageModelSession pageModel =
         Auth model ->
             model.session
 
-        Home model ->
+        Dashboard model ->
             model.session
 
 
@@ -123,7 +123,7 @@ update msg model =
 
                                 appModel =
                                     { currentRoute = DashboardRoute
-                                    , pageModel = Home (Home.defaultModel authSession)
+                                    , pageModel = Dashboard (Dashboard.defaultModel authSession)
                                     , session = authSession
                                     }
 
@@ -149,7 +149,7 @@ update msg model =
                                     , session = guestSession
                                     }
                             in
-                            ( Ready appModel, Navigation.pushUrl key (routePath AuthRoute) )
+                            ( Ready appModel, Routing.routeTo AuthRoute guestSession )
 
                 _ ->
                     ( model, Cmd.none )
@@ -176,9 +176,9 @@ readyUpdate msg model navKey =
             Auth.update authMsg authModel
                 |> updateWith Auth GotAuthMsg model
 
-        ( GotHomeMsg homeMsg, Home homeModel ) ->
-            Home.update homeMsg homeModel
-                |> updateWith Home GotHomeMsg model
+        ( GotDashboardMsg homeMsg, Dashboard homeModel ) ->
+            Dashboard.update homeMsg homeModel
+                |> updateWith Dashboard GotDashboardMsg model
 
         ( ChangedUrl url, _ ) ->
             let
@@ -211,14 +211,14 @@ readyUpdate msg model navKey =
                 External url ->
                     ( Ready model, Navigation.load url )
 
-        ( GotAccounts response, Home homeModel ) ->
+        ( GotAccounts response, Dashboard homeModel ) ->
             case response of
                 Ok accounts ->
                     let
                         pageModel =
                             { homeModel | session = Session.addAccountsToSession homeModel.session accounts }
                     in
-                    ( Ready { model | pageModel = Home pageModel }, Cmd.none )
+                    ( Ready { model | pageModel = Dashboard pageModel }, Cmd.none )
 
                 Err _ ->
                     ( Ready model, Cmd.none )
@@ -233,10 +233,10 @@ readyUpdate msg model navKey =
         ( GotAccounts response, _ ) ->
             ( Ready model, Cmd.none )
 
-        ( GotAuthMsg _, Home _ ) ->
+        ( GotAuthMsg _, Dashboard _ ) ->
             ( Ready model, Cmd.none )
 
-        ( GotHomeMsg _, Auth _ ) ->
+        ( GotDashboardMsg _, Auth _ ) ->
             ( Ready model, Cmd.none )
 
 
@@ -251,6 +251,22 @@ updateWith toModel toMsg model ( subModel, subCmd ) =
     )
 
 
+routeHandler : Route -> ( Route, Maybe Msg )
+routeHandler route =
+    case route of
+        DashboardRoute ->
+            ( DashboardRoute, Just (GotDashboardMsg Dashboard.routeHandler) )
+
+        AuthRoute ->
+            ( AuthRoute, Nothing )
+
+        AccountDetailRoute id ->
+            ( AccountDetailRoute id, Nothing )
+
+        NotFoundRoute ->
+            ( NotFoundRoute, Nothing )
+
+
 
 ---- VIEW ----
 
@@ -262,18 +278,16 @@ pageView model =
             Auth.view authModel
                 |> map GotAuthMsg
 
-        Home homeModel ->
-            Home.view homeModel
-                |> map GotHomeMsg
+        Dashboard dashboardModel ->
+            Dashboard.view dashboardModel
+                |> map GotDashboardMsg
 
 
 navbarView : Route -> Html Msg
 navbarView route =
     div []
-        [ a [ href (routePath DashboardRoute) ]
-            [ text "Dashboard" ]
-        , a [ href (routePath AuthRoute) ]
-            [ text "Login/Register" ]
+        [ Routing.routeLink "Dashboard" (routeHandler DashboardRoute)
+        , Routing.routeLink "Login/Register" (routeHandler AuthRoute)
         ]
 
 
@@ -304,7 +318,7 @@ view model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Home.subscriptions |> Sub.map GotHomeMsg
+        [ Dashboard.subscriptions |> Sub.map GotDashboardMsg
         ]
 
 

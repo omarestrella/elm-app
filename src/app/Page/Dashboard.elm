@@ -1,4 +1,4 @@
-port module Page.Home exposing (Model, Msg, defaultModel, linkResponse, subscriptions, update, view)
+port module Page.Dashboard exposing (Model, Msg, defaultModel, linkResponse, routeHandler, subscriptions, update, view)
 
 import Api exposing (ApiEnvironment(..))
 import Component.Button as Button
@@ -17,6 +17,8 @@ type Msg
     | StartLink
     | LinkResponseMsg (Result Decode.Error LinkResponse)
     | HandleItemLink (Result Http.Error Session.Item)
+    | LoadAccounts
+    | GotAccounts (Result Http.Error (List Session.Account))
 
 
 defaultUser =
@@ -43,6 +45,11 @@ type alias Model =
 
 
 --Update
+
+
+routeHandler : Msg
+routeHandler =
+    LoadAccounts
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -83,6 +90,28 @@ update msg model =
                       }
                     , Cmd.none
                     )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+        LoadAccounts ->
+            let
+                token =
+                    Session.accessToken model.session
+
+                accountTokens =
+                    Session.accountTokens model.session
+            in
+            ( model, Session.loadAccounts GotAccounts token accountTokens )
+
+        GotAccounts response ->
+            case response of
+                Ok accounts ->
+                    let
+                        newModel =
+                            { model | session = Session.addAccountsToSession model.session accounts }
+                    in
+                    ( newModel, Cmd.none )
 
                 Err _ ->
                     ( model, Cmd.none )
