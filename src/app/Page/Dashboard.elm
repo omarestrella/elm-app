@@ -1,16 +1,17 @@
-port module Page.Dashboard exposing (Model, Msg, defaultModel, linkResponse, routeHandler, subscriptions, update, view)
+port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkResponse, routeHandler, subscriptions, update, view)
 
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
-import Html.Styled exposing (Html, div, li, span, text, ul)
-import Html.Styled.Attributes exposing (css, id)
-import Html.Styled.Events exposing (onClick)
+import Component.Input as Input
+import Html.Styled exposing (Html, a, button, div, input, li, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Styled.Attributes exposing (class, css, href, id, placeholder, value)
+import Html.Styled.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode
-import Json.Decode.Pipeline exposing (hardcoded, optional, required)
+import Json.Decode.Pipeline exposing (hardcoded, optional, required, resolve)
 import Link exposing (LinkResponse(..), linkResponseDecoder)
 import Session exposing (Session(..))
-import Style exposing (accountsList, homeContainer)
+import Style.Dashboard as Style
 
 
 type Msg
@@ -19,8 +20,17 @@ type Msg
     | LinkResponseMsg (Result Decode.Error LinkResponse)
     | HandleItemLink (Result Http.Error Session.Item)
     | LoadData
+    | AddBudgetGroup
+    | PerformCategorySearch String
     | GotAccounts (Result Http.Error (List Session.Account))
     | GotTransactions (Result Http.Error (List Transaction))
+    | GotCategories (Result Http.Error (List Category))
+
+
+type CategoryState
+    = Loading String
+    | Default (List Category)
+    | Search String (List Category)
 
 
 defaultUser =
@@ -36,6 +46,8 @@ defaultModel session =
     , linkResponse = LinkError []
     , session = session
     , transactions = []
+    , categories = Default []
+    , addNewGroup = False
     }
 
 
@@ -44,6 +56,8 @@ type alias Model =
     , linkResponse : LinkResponse
     , session : Session
     , transactions : List Transaction
+    , categories : CategoryState
+    , addNewGroup : Bool
     }
 
 
@@ -53,6 +67,28 @@ type alias Transaction =
     , date : String
     , name : String
     , pending : Bool
+    }
+
+
+type alias Category =
+    { id : String
+    , group : String
+    , hierarchy : List String
+    }
+
+
+type alias BudgetGroup =
+    { id : String
+    , name : String
+    , items : List BudgetItem
+    , category : Category
+    }
+
+
+type alias BudgetItem =
+    { id : String
+    , name : String
+    , plannedSpending : Float
     }
 
 
@@ -66,8 +102,63 @@ transactionDecoder =
         |> required "pending" Decode.bool
 
 
+categoryDecoder : Decode.Decoder Category
+categoryDecoder =
+    Decode.succeed Category
+        |> required "category_id" Decode.string
+        |> required "group" Decode.string
+        |> required "hierarchy" (Decode.list Decode.string)
+
+
+budgetGroupDecoder : List Category -> Decode.Decoder BudgetGroup
+budgetGroupDecoder categories =
+    let
+        toDecoder : String -> String -> List BudgetItem -> Decode.Decoder BudgetGroup
+        toDecoder id name items =
+            let
+                possibleCategory =
+                    List.head categories
+            in
+            case possibleCategory of
+                Just category ->
+                    Decode.succeed (BudgetGroup id name items category)
+
+                Nothing ->
+                    Decode.fail "Category required for budget"
+    in
+    Decode.succeed toDecoder
+        |> required "id" Decode.string
+        |> required "name" Decode.string
+        |> required "items" (Decode.list budgetItemDecoder)
+        |> resolve
+
+
+budgetItemDecoder : Decode.Decoder BudgetItem
+budgetItemDecoder =
+    Decode.succeed BudgetItem
+        |> required "id" Decode.string
+        |> required "name" Decode.string
+        |> required "plannedSpending" Decode.float
+
+
 
 --Update
+
+
+bootstrap : Session -> Cmd Msg
+bootstrap session =
+    let
+        token =
+            Session.accessToken session
+
+        accountTokens =
+            Session.accountTokens session
+    in
+    Cmd.batch
+        [ Session.loadAccounts GotAccounts token accountTokens
+        , loadTransactions token accountTokens
+        , loadCategories token
+        ]
 
 
 routeHandler : Msg
@@ -118,18 +209,8 @@ update msg model =
                     ( model, Cmd.none )
 
         LoadData ->
-            let
-                token =
-                    Session.accessToken model.session
-
-                accountTokens =
-                    Session.accountTokens model.session
-            in
             ( model
-            , Cmd.batch
-                [ Session.loadAccounts GotAccounts token accountTokens
-                , loadTransactions token accountTokens
-                ]
+            , bootstrap model.session
             )
 
         GotAccounts response ->
@@ -152,6 +233,36 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
+        GotCategories response ->
+            case response of
+                Ok categories ->
+                    case model.categories of
+                        Loading string ->
+                            if String.length string == 0 then
+                                ( { model | categories = Default categories }, Cmd.none )
+
+                            else
+                                ( { model | categories = Search string categories }, Cmd.none )
+
+                        Search string _ ->
+                            ( { model | categories = Search string categories }, Cmd.none )
+
+                        Default _ ->
+                            ( { model | categories = Default categories }, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+        PerformCategorySearch search ->
+            if String.length search > 0 then
+                ( { model | categories = Loading search }, loadCategories (Session.accessToken model.session) )
+
+            else
+                ( { model | categories = Loading "" }, Cmd.none )
+
+        AddBudgetGroup ->
+            ( { model | addNewGroup = True }, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -171,6 +282,28 @@ loadTransactions token accessTokens =
         }
 
 
+loadCategories : String -> Cmd Msg
+loadCategories token =
+    let
+        url =
+            Api.url "categories"
+    in
+    Api.request
+        { url = url
+        , accessToken = Just token
+        , method = GET
+        , body = Nothing
+        , handler = Http.expectJson GotCategories (Decode.list categoryDecoder)
+        }
+
+
+categoryText : Category -> String
+categoryText category =
+    List.reverse category.hierarchy
+        |> List.head
+        |> Maybe.withDefault ""
+
+
 
 -- View
 
@@ -179,7 +312,7 @@ accountsPane : List Session.Account -> Html Msg
 accountsPane accounts =
     div []
         [ Button.primary "Add account" StartLink
-        , div [ css accountsList ] <|
+        , div [] <|
             List.map
                 (\account ->
                     div []
@@ -204,6 +337,99 @@ transactionsPane transactions =
             transactions
 
 
+addNewGroupView : Model -> Html Msg
+addNewGroupView model =
+    div [ css Style.addNewBudgetGroup ]
+        [ if model.addNewGroup then
+            table [ class "table" ]
+                [ thead []
+                    [ th [] [ text "Name" ]
+                    , th [] [ text "Amount" ]
+                    ]
+                , tbody []
+                    [ tr []
+                        [ td []
+                            [ input []
+                                []
+                            ]
+                        , td []
+                            [ input []
+                                []
+                            ]
+                        ]
+                    ]
+                ]
+
+          else
+            text ""
+        ]
+
+
+categoryListSearchView : CategoryState -> Html Msg
+categoryListSearchView categoryState =
+    let
+        searchValue =
+            case categoryState of
+                Search searchString _ ->
+                    searchString
+
+                Loading searchString ->
+                    searchString
+
+                _ ->
+                    ""
+    in
+    div []
+        [ Input.default [ value searchValue, onInput PerformCategorySearch, placeholder "Search or add new..." ] [] ]
+
+
+categoryListView : CategoryState -> Html Msg
+categoryListView categoryState =
+    case categoryState of
+        Default categories ->
+            div [] <|
+                List.map
+                    (\category ->
+                        div []
+                            [ a [ href "#" ]
+                                [ text (categoryText category) ]
+                            ]
+                    )
+                    categories
+
+        Search _ categories ->
+            div [] <|
+                List.map
+                    (\category ->
+                        div []
+                            [ a [ href "#" ]
+                                [ text (categoryText category) ]
+                            ]
+                    )
+                    categories
+
+        Loading _ ->
+            div []
+                [ text "Loading..." ]
+
+
+categoryPickerView : Model -> Html Msg
+categoryPickerView model =
+    div []
+        [ categoryListSearchView model.categories
+        , categoryListView model.categories
+        ]
+
+
+budgetGroupListView : Model -> Html Msg
+budgetGroupListView model =
+    div [ css Style.budgetGroupList ]
+        [ Button.primary "Add Group" AddBudgetGroup
+        , addNewGroupView model
+        , categoryPickerView model
+        ]
+
+
 view : Model -> Html Msg
 view model =
     case model.session of
@@ -211,9 +437,11 @@ view model =
             text "Guest Home"
 
         LoggedIn _ data ->
-            div [ css homeContainer ]
-                [ accountsPane data.accounts
-                , transactionsPane model.transactions
+            div [ css Style.budgetContainer ]
+                [ budgetGroupListView model
+
+                -- accountsPane data.accounts
+                -- , transactionsPane model.transactions
                 ]
 
 

@@ -15,6 +15,7 @@ import Page.Dashboard as Dashboard
 import Routing exposing (..)
 import Session exposing (Session(..), SessionData, getSession)
 import Url exposing (Url)
+import Task
 
 
 
@@ -43,7 +44,6 @@ type Msg
     | ChangedUrl Url
     | ClickedLink UrlRequest
     | GotSession String (Result Http.Error Session.User)
-    | GotAccounts (Result Http.Error (List Session.Account))
     | GotAuthMsg Auth.Msg
     | GotDashboardMsg Dashboard.Msg
 
@@ -150,7 +150,7 @@ update msg model =
                             , Cmd.batch
                                 [ Routing.routeTo DashboardRoute authSession
                                 , Storage.set "accessToken" token
-                                , Session.loadAccounts GotAccounts token accountTokens
+                                , Dashboard.bootstrap authSession |> Cmd.map GotDashboardMsg
                                 ]
                             )
 
@@ -227,26 +227,11 @@ readyUpdate msg model navKey =
                 External url ->
                     ( Ready model, Navigation.load url )
 
-        ( GotAccounts response, Dashboard homeModel ) ->
-            case response of
-                Ok accounts ->
-                    let
-                        pageModel =
-                            { homeModel | session = Session.addAccountsToSession homeModel.session accounts }
-                    in
-                    ( Ready { model | pageModel = Dashboard pageModel }, Cmd.none )
-
-                Err _ ->
-                    ( Ready model, Cmd.none )
-
         -- The following do nothing
         ( NoOp, _ ) ->
             ( Ready model, Cmd.none )
 
         ( GotSession _ _, _ ) ->
-            ( Ready model, Cmd.none )
-
-        ( GotAccounts response, _ ) ->
             ( Ready model, Cmd.none )
 
         ( GotAuthMsg _, Dashboard _ ) ->

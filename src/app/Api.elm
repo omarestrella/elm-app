@@ -1,4 +1,4 @@
-module Api exposing (ApiEnvironment(..), Method(..), RequestOptions, accessTokensUrl, methodString, request)
+module Api exposing (ApiEnvironment(..), Method(..), RequestOptions, accessTokensUrl, methodString, request, url)
 
 import Http
 import Json.Decode as Decode exposing (field, int, string)
@@ -30,6 +30,11 @@ type Method
 
 
 -- Utility
+
+
+url : String -> String
+url url_ =
+    Builder.absolute [ url_ ] []
 
 
 accessTokensUrl : List String -> String -> String
