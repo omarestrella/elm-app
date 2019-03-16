@@ -9,6 +9,7 @@ import Html.Styled.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline exposing (hardcoded, optional, required, resolve)
+import Json.Encode as Encode
 import Link exposing (LinkResponse(..), linkResponseDecoder)
 import Session exposing (Session(..))
 import Style.Dashboard as Style
@@ -81,7 +82,6 @@ type alias BudgetGroup =
     { id : String
     , name : String
     , items : List BudgetItem
-    , category : Category
     }
 
 
@@ -89,6 +89,13 @@ type alias BudgetItem =
     { id : String
     , name : String
     , plannedSpending : Float
+    , category : Category
+    }
+
+
+type alias Error =
+    { code : String
+    , message : String
     }
 
 
@@ -112,33 +119,42 @@ categoryDecoder =
 
 budgetGroupDecoder : List Category -> Decode.Decoder BudgetGroup
 budgetGroupDecoder categories =
+    Decode.succeed BudgetGroup
+        |> required "id" Decode.string
+        |> required "name" Decode.string
+        |> required "items" (Decode.list (budgetItemDecoder categories))
+
+
+budgetItemDecoder : List Category -> Decode.Decoder BudgetItem
+budgetItemDecoder categories =
     let
-        toDecoder : String -> String -> List BudgetItem -> Decode.Decoder BudgetGroup
-        toDecoder id name items =
+        toDecoder : String -> String -> Float -> String -> Decode.Decoder BudgetItem
+        toDecoder id name spending categoryId =
             let
                 possibleCategory =
-                    List.head categories
+                    List.filter (\category -> category.id == categoryId) categories
+                        |> List.head
             in
             case possibleCategory of
                 Just category ->
-                    Decode.succeed (BudgetGroup id name items category)
+                    Decode.succeed (BudgetItem id name spending category)
 
                 Nothing ->
-                    Decode.fail "Category required for budget"
+                    Decode.fail ("Category with id " ++ categoryId ++ " not found")
     in
     Decode.succeed toDecoder
         |> required "id" Decode.string
         |> required "name" Decode.string
-        |> required "items" (Decode.list budgetItemDecoder)
+        |> required "plannedSpending" Decode.float
+        |> required "categoryId" Decode.string
         |> resolve
 
 
-budgetItemDecoder : Decode.Decoder BudgetItem
-budgetItemDecoder =
-    Decode.succeed BudgetItem
-        |> required "id" Decode.string
-        |> required "name" Decode.string
-        |> required "plannedSpending" Decode.float
+errorDecoder : Decode.Decoder Error
+errorDecoder =
+    Decode.succeed Error
+        |> required "code" Decode.string
+        |> required "message" Decode.string
 
 
 
@@ -230,7 +246,11 @@ update msg model =
                 Ok transactions ->
                     ( { model | transactions = transactions }, Cmd.none )
 
-                Err _ ->
+                Err err ->
+                    let
+                        _ =
+                            Debug.log "Error" err
+                    in
                     ( model, Cmd.none )
 
         GotCategories response ->
@@ -255,10 +275,10 @@ update msg model =
 
         PerformCategorySearch search ->
             if String.length search > 0 then
-                ( { model | categories = Loading search }, loadCategories (Session.accessToken model.session) )
+                ( { model | categories = Loading search }, searchCategories search (Session.accessToken model.session) )
 
             else
-                ( { model | categories = Loading "" }, Cmd.none )
+                ( { model | categories = Loading "" }, loadCategories (Session.accessToken model.session) )
 
         AddBudgetGroup ->
             ( { model | addNewGroup = True }, Cmd.none )
@@ -278,7 +298,8 @@ loadTransactions token accessTokens =
         , accessToken = Just token
         , method = GET
         , body = Nothing
-        , handler = Http.expectJson GotTransactions (Decode.list transactionDecoder)
+        , handler =
+            Http.expectJson GotTransactions (Decode.list transactionDecoder)
         }
 
 
@@ -293,6 +314,24 @@ loadCategories token =
         , accessToken = Just token
         , method = GET
         , body = Nothing
+        , handler = Http.expectJson GotCategories (Decode.list categoryDecoder)
+        }
+
+
+searchCategories : String -> String -> Cmd Msg
+searchCategories search token =
+    let
+        url =
+            Api.url "categories/search"
+
+        body =
+            Encode.object [ ( "query", Encode.string search ) ]
+    in
+    Api.request
+        { url = url
+        , accessToken = Just token
+        , method = POST
+        , body = Just (Http.jsonBody body)
         , handler = Http.expectJson GotCategories (Decode.list categoryDecoder)
         }
 
@@ -380,7 +419,10 @@ categoryListSearchView categoryState =
                     ""
     in
     div []
-        [ Input.default [ value searchValue, onInput PerformCategorySearch, placeholder "Search or add new..." ] [] ]
+        [ Input.default
+            [ value searchValue, onInput PerformCategorySearch, placeholder "Search or add new..." ]
+            []
+        ]
 
 
 categoryListView : CategoryState -> Html Msg
