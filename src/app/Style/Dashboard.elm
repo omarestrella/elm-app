@@ -19,6 +19,7 @@ budgetGroupList =
 
 budgetGroupContainer =
     [ boxShadow4 (px 0) (px 0) (px 3) (rgba 0 0 0 0.3)
+    , padding (px 10)
     ]
 
 

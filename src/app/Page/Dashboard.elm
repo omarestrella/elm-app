@@ -3,10 +3,11 @@ port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkRe
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
 import Component.Input as Input
-import Html.Styled exposing (Html, a, button, div, input, li, span, table, tbody, td, text, th, thead, tr, ul)
-import Html.Styled.Attributes exposing (class, css, href, id, placeholder, value)
-import Html.Styled.Events exposing (onClick, onInput)
+import Html.Styled exposing (Html, a, button, div, form, input, label, li, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
+import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
+import Http.Detailed
 import Json.Decode as Decode
 import Json.Decode.Pipeline exposing (hardcoded, optional, required, resolve)
 import Json.Encode as Encode
@@ -21,11 +22,11 @@ type Msg
     | LinkResponseMsg (Result Decode.Error LinkResponse)
     | HandleItemLink (Result Http.Error Session.Item)
     | LoadData
-    | AddBudgetGroup
+    | SetAddBudgetGroup Bool
     | PerformCategorySearch String
     | GotAccounts (Result Http.Error (List Session.Account))
-    | GotTransactions (Result Http.Error (List Transaction))
     | GotCategories (Result Http.Error (List Category))
+    | GotTransactions (Result (Http.Detailed.Error String) ( List Transaction, Http.Metadata ))
 
 
 type CategoryState
@@ -49,6 +50,7 @@ defaultModel session =
     , transactions = []
     , categories = Default []
     , addNewGroup = False
+    , errors = []
     }
 
 
@@ -59,6 +61,7 @@ type alias Model =
     , transactions : List Transaction
     , categories : CategoryState
     , addNewGroup : Bool
+    , errors : List Error
     }
 
 
@@ -169,10 +172,27 @@ bootstrap session =
 
         accountTokens =
             Session.accountTokens session
+
+        haveAccountTokens =
+            List.length accountTokens > 0
+
+        accountsCmd =
+            if haveAccountTokens then
+                Session.loadAccounts GotAccounts token accountTokens
+
+            else
+                Cmd.none
+
+        transactionsCmd =
+            if haveAccountTokens then
+                loadTransactions token accountTokens
+
+            else
+                Cmd.none
     in
     Cmd.batch
-        [ Session.loadAccounts GotAccounts token accountTokens
-        , loadTransactions token accountTokens
+        [ accountsCmd
+        , transactionsCmd
         , loadCategories token
         ]
 
@@ -243,15 +263,25 @@ update msg model =
 
         GotTransactions response ->
             case response of
-                Ok transactions ->
+                Ok ( transactions, _ ) ->
                     ( { model | transactions = transactions }, Cmd.none )
 
-                Err err ->
-                    let
-                        _ =
-                            Debug.log "Error" err
-                    in
-                    ( model, Cmd.none )
+                Err error ->
+                    case error of
+                        Http.Detailed.BadStatus metadata body statusCode ->
+                            let
+                                decodedError =
+                                    Decode.decodeString errorDecoder body
+                            in
+                            case decodedError of
+                                Ok apiError ->
+                                    ( { model | errors = apiError :: model.errors }, Cmd.none )
+
+                                Err _ ->
+                                    ( model, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
 
         GotCategories response ->
             case response of
@@ -280,8 +310,8 @@ update msg model =
             else
                 ( { model | categories = Loading "" }, loadCategories (Session.accessToken model.session) )
 
-        AddBudgetGroup ->
-            ( { model | addNewGroup = True }, Cmd.none )
+        SetAddBudgetGroup value ->
+            ( { model | addNewGroup = value }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -299,7 +329,7 @@ loadTransactions token accessTokens =
         , method = GET
         , body = Nothing
         , handler =
-            Http.expectJson GotTransactions (Decode.list transactionDecoder)
+            Http.Detailed.expectJson GotTransactions (Decode.list transactionDecoder)
         }
 
 
@@ -379,28 +409,16 @@ transactionsPane transactions =
 addNewGroupView : Model -> Html Msg
 addNewGroupView model =
     div [ css Style.addNewBudgetGroup ]
-        [ if model.addNewGroup then
-            table [ class "table" ]
-                [ thead []
-                    [ th [] [ text "Name" ]
-                    , th [] [ text "Amount" ]
-                    ]
-                , tbody []
-                    [ tr []
-                        [ td []
-                            [ input []
-                                []
-                            ]
-                        , td []
-                            [ input []
-                                []
-                            ]
-                        ]
-                    ]
+        [ form [ onSubmit NoOp ]
+            [ div []
+                [ label [] [ text "Name" ], Input.default [] [] ]
+            , div []
+                [ label [] [ text "Amount" ], Input.default [ type_ "number" ] [] ]
+            , div []
+                [ Button.primary "Add" NoOp
+                , Button.link "Cancel" (SetAddBudgetGroup False)
                 ]
-
-          else
-            text ""
+            ]
         ]
 
 
@@ -466,9 +484,14 @@ categoryPickerView model =
 budgetGroupListView : Model -> Html Msg
 budgetGroupListView model =
     div [ css Style.budgetGroupList ]
-        [ Button.primary "Add Group" AddBudgetGroup
-        , addNewGroupView model
-        , categoryPickerView model
+        [ Button.primary "Add Group" (SetAddBudgetGroup True)
+        , if model.addNewGroup then
+            addNewGroupView model
+
+          else
+            text ""
+
+        -- , categoryPickerView model
         ]
 
 
