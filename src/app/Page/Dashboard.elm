@@ -22,7 +22,8 @@ type Msg
     | LinkResponseMsg (Result Decode.Error LinkResponse)
     | HandleItemLink (Result Http.Error Session.Item)
     | LoadData
-    | SetAddBudgetGroup Bool
+    | UpdateBudgetGroup String Int
+    | ClearBudgetGroup
     | PerformCategorySearch String
     | GotAccounts (Result Http.Error (List Session.Account))
     | GotCategories (Result Http.Error (List Category))
@@ -33,6 +34,11 @@ type CategoryState
     = Loading String
     | Default (List Category)
     | Search String (List Category)
+
+
+type NewBudgetGroup
+    = None
+    | New String Int
 
 
 defaultUser =
@@ -49,7 +55,7 @@ defaultModel session =
     , session = session
     , transactions = []
     , categories = Default []
-    , addNewGroup = False
+    , newBudgetGroup = None
     , errors = []
     }
 
@@ -60,7 +66,7 @@ type alias Model =
     , session : Session
     , transactions : List Transaction
     , categories : CategoryState
-    , addNewGroup : Bool
+    , newBudgetGroup : NewBudgetGroup
     , errors : List Error
     }
 
@@ -310,8 +316,11 @@ update msg model =
             else
                 ( { model | categories = Loading "" }, loadCategories (Session.accessToken model.session) )
 
-        SetAddBudgetGroup value ->
-            ( { model | addNewGroup = value }, Cmd.none )
+        UpdateBudgetGroup name value ->
+            ( { model | newBudgetGroup = New name value }, Cmd.none )
+
+        ClearBudgetGroup ->
+            ( { model | newBudgetGroup = None }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -408,18 +417,31 @@ transactionsPane transactions =
 
 addNewGroupView : Model -> Html Msg
 addNewGroupView model =
-    div [ css Style.addNewBudgetGroup ]
-        [ form [ onSubmit NoOp ]
-            [ div []
-                [ label [] [ text "Name" ], Input.default [] [] ]
-            , div []
-                [ label [] [ text "Amount" ], Input.default [ type_ "number" ] [] ]
-            , div []
-                [ Button.primary "Add" NoOp
-                , Button.link "Cancel" (SetAddBudgetGroup False)
+    case model.newBudgetGroup of
+        New name amount ->
+            div [ css Style.addNewBudgetGroup ]
+                [ form [ onSubmit NoOp ]
+                    [ div []
+                        [ label [] [ text "Name" ]
+                        , Input.default
+                            [ value name, onInput (\val -> UpdateBudgetGroup val amount) ]
+                            []
+                        ]
+                    , div []
+                        [ label [] [ text "Amount" ]
+                        , Input.default
+                            [ type_ "number", value (String.fromInt amount), onInput (\val -> UpdateBudgetGroup name (String.toInt val |> Maybe.withDefault 0)) ]
+                            []
+                        ]
+                    , div []
+                        [ Button.primary "Add" NoOp
+                        , Button.link "Cancel" ClearBudgetGroup
+                        ]
+                    ]
                 ]
-            ]
-        ]
+
+        None ->
+            div [] []
 
 
 categoryListSearchView : CategoryState -> Html Msg
@@ -484,12 +506,13 @@ categoryPickerView model =
 budgetGroupListView : Model -> Html Msg
 budgetGroupListView model =
     div [ css Style.budgetGroupList ]
-        [ Button.primary "Add Group" (SetAddBudgetGroup True)
-        , if model.addNewGroup then
-            addNewGroupView model
+        [ Button.primary "Add Group" (UpdateBudgetGroup "" 0)
+        , case model.newBudgetGroup of
+            New _ _ ->
+                addNewGroupView model
 
-          else
-            text ""
+            None ->
+                text ""
 
         -- , categoryPickerView model
         ]
