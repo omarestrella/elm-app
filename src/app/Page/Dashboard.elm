@@ -3,7 +3,7 @@ port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkRe
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
 import Component.Input as Input
-import Html.Styled exposing (Html, a, button, div, form, input, label, li, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Styled exposing (Html, a, button, div, form, h6, input, label, li, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
@@ -436,8 +436,8 @@ addNewGroupView model =
                     , div []
                         [ Button.primary [ type_ "submit" ]
                             [ text "Add" ]
-                        , Button.link [type_ "reset", onClick ClearBudgetGroup]
-                            [text "Cancel"]
+                        , Button.link [ type_ "reset", onClick ClearBudgetGroup ]
+                            [ text "Cancel" ]
                         ]
                     ]
                 ]
@@ -520,6 +520,34 @@ budgetGroupListView model =
         ]
 
 
+snapshotView : Model -> Html Msg
+snapshotView model =
+    div [ css Style.snapshotContainer ]
+        [ div [ css Style.snapshotEntryContainer, css Style.snapshotBalance ]
+            [ h6 [ css Style.snapshotEntryHeading ]
+                [ text "Balance" ]
+            , span [ css Style.snapshotEntryValue ]
+                [ text "$15,000" ]
+            ]
+        , div [ css Style.snapshotEntryContainer, css Style.snapshotIncomeSpending ]
+            [ div []
+                [ h6 [ css Style.snapshotEntryHeading ]
+                    [ text "Income" ]
+                , span [ css Style.snapshotEntryValue ]
+                    [ text "$1,500" ]
+                ]
+            , div []
+                [ h6 [ css Style.snapshotEntryHeading ]
+                    [ text "Spending" ]
+                , span [ css Style.snapshotEntryValue ]
+                    [ text "$1,200" ]
+                ]
+            ]
+        , div [ css Style.snapshotEntryContainer ]
+            [ text "[ chart? ]" ]
+        ]
+
+
 view : Model -> Html Msg
 view model =
     case model.session of
@@ -528,7 +556,8 @@ view model =
 
         LoggedIn _ data ->
             div [ css Style.budgetContainer ]
-                [
+                [ snapshotView model
+
                 -- budgetGroupListView model
                 -- , accountsPane data.accounts
                 -- , transactionsPane model.transactions
