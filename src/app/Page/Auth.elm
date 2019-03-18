@@ -250,7 +250,7 @@ registerFormView registrationForm =
                 []
             ]
         , button []
-            [ text "Login" ]
+            [ text "Register" ]
         ]
 
 

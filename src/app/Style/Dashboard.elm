@@ -7,7 +7,7 @@ budgetContainer =
     [ displayFlex
     , flexDirection column
     , padding (px 20)
-    , width (pct 50)
+    , width (pct 70)
     ]
 
 

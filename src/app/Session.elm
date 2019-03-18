@@ -15,7 +15,7 @@ type Session
 
 
 type alias User =
-    { id : Int
+    { id : String
     , firstName : String
     , lastName : String
     , email : String
@@ -24,7 +24,7 @@ type alias User =
 
 
 type alias Item =
-    { id : Int
+    { id : String
     , itemId : String
     , accessToken : String
     }
@@ -177,7 +177,7 @@ encode session =
                     [ ( "accessToken", Encode.string data.accessToken )
                     , ( "user"
                       , Encode.object
-                            [ ( "id", Encode.int data.user.id )
+                            [ ( "id", Encode.string data.user.id )
                             , ( "firstName", Encode.string data.user.firstName )
                             , ( "lastName", Encode.string data.user.lastName )
                             , ( "email", Encode.string data.user.email )
@@ -185,7 +185,7 @@ encode session =
                               , Encode.list
                                     (\item ->
                                         Encode.object
-                                            [ ( "id", Encode.int item.id )
+                                            [ ( "id", Encode.string item.id )
                                             , ( "itemId", Encode.string item.itemId )
                                             , ( "accessToken", Encode.string item.accessToken )
                                             ]
@@ -200,7 +200,7 @@ encode session =
 userDecoder : Decode.Decoder User
 userDecoder =
     Decode.succeed User
-        |> required "id" int
+        |> required "id" string
         |> required "firstName" string
         |> required "lastName" string
         |> required "email" string
@@ -210,7 +210,7 @@ userDecoder =
 itemDecoder : Decode.Decoder Item
 itemDecoder =
     Decode.map3 Item
-        (field "id" int)
+        (field "id" string)
         (field "itemId" string)
         (field "accessToken" string)
 

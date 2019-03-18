@@ -22,8 +22,9 @@ type Msg
     | LinkResponseMsg (Result Decode.Error LinkResponse)
     | HandleItemLink (Result Http.Error Session.Item)
     | LoadData
-    | UpdateBudgetGroup String Int
+    | UpdateBudgetGroup String
     | ClearBudgetGroup
+    | SubmitNewBudgetGroup String
     | PerformCategorySearch String
     | GotAccounts (Result Http.Error (List Session.Account))
     | GotCategories (Result Http.Error (List Category))
@@ -38,7 +39,7 @@ type CategoryState
 
 type NewBudgetGroup
     = None
-    | New String Int
+    | New String
 
 
 defaultUser =
@@ -55,6 +56,7 @@ defaultModel session =
     , session = session
     , transactions = []
     , categories = Default []
+    , budgetGroups = []
     , newBudgetGroup = None
     , errors = []
     }
@@ -66,6 +68,7 @@ type alias Model =
     , session : Session
     , transactions : List Transaction
     , categories : CategoryState
+    , budgetGroups : List BudgetGroup
     , newBudgetGroup : NewBudgetGroup
     , errors : List Error
     }
@@ -316,11 +319,14 @@ update msg model =
             else
                 ( { model | categories = Loading "" }, loadCategories (Session.accessToken model.session) )
 
-        UpdateBudgetGroup name value ->
-            ( { model | newBudgetGroup = New name value }, Cmd.none )
+        UpdateBudgetGroup name ->
+            ( { model | newBudgetGroup = New name }, Cmd.none )
 
         ClearBudgetGroup ->
             ( { model | newBudgetGroup = None }, Cmd.none )
+
+        SubmitNewBudgetGroup name ->
+            ( { model | budgetGroups = model.budgetGroups ++ [ { id = "", name = name, items = [] } ] }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -389,7 +395,7 @@ categoryText category =
 accountsPane : List Session.Account -> Html Msg
 accountsPane accounts =
     div []
-        [ Button.primary "Add account" StartLink
+        [ Button.primary [ onClick StartLink ] [ text "Add account" ]
         , div [] <|
             List.map
                 (\account ->
@@ -418,24 +424,20 @@ transactionsPane transactions =
 addNewGroupView : Model -> Html Msg
 addNewGroupView model =
     case model.newBudgetGroup of
-        New name amount ->
+        New name ->
             div [ css Style.addNewBudgetGroup ]
-                [ form [ onSubmit NoOp ]
+                [ form [ onSubmit (SubmitNewBudgetGroup name) ]
                     [ div []
                         [ label [] [ text "Name" ]
                         , Input.default
-                            [ value name, onInput (\val -> UpdateBudgetGroup val amount) ]
+                            [ value name, onInput UpdateBudgetGroup ]
                             []
                         ]
                     , div []
-                        [ label [] [ text "Amount" ]
-                        , Input.default
-                            [ type_ "number", value (String.fromInt amount), onInput (\val -> UpdateBudgetGroup name (String.toInt val |> Maybe.withDefault 0)) ]
-                            []
-                        ]
-                    , div []
-                        [ Button.primary "Add" NoOp
-                        , Button.link "Cancel" ClearBudgetGroup
+                        [ Button.primary [ type_ "submit" ]
+                            [ text "Add" ]
+                        , Button.link [type_ "reset", onClick ClearBudgetGroup]
+                            [text "Cancel"]
                         ]
                     ]
                 ]
@@ -506,9 +508,9 @@ categoryPickerView model =
 budgetGroupListView : Model -> Html Msg
 budgetGroupListView model =
     div [ css Style.budgetGroupList ]
-        [ Button.primary "Add Group" (UpdateBudgetGroup "" 0)
+        [ Button.primary [ onClick (UpdateBudgetGroup "") ] [ text "Add Group" ]
         , case model.newBudgetGroup of
-            New _ _ ->
+            New _ ->
                 addNewGroupView model
 
             None ->
@@ -526,9 +528,9 @@ view model =
 
         LoggedIn _ data ->
             div [ css Style.budgetContainer ]
-                [ budgetGroupListView model
-
-                -- accountsPane data.accounts
+                [
+                -- budgetGroupListView model
+                -- , accountsPane data.accounts
                 -- , transactionsPane model.transactions
                 ]
 
