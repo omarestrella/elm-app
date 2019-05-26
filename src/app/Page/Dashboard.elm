@@ -3,15 +3,17 @@ port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkRe
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
 import Component.Input as Input
+import Date exposing (Date)
 import Html.Styled exposing (Html, a, button, div, form, h6, input, label, li, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
 import Http.Detailed
 import Json.Decode as Decode
-import Json.Decode.Pipeline exposing (hardcoded, optional, required, resolve)
+import Json.Decode.Pipeline exposing (hardcoded, optional, required, requiredAt, resolve)
 import Json.Encode as Encode
 import Link exposing (LinkResponse(..), linkResponseDecoder)
+import List.Extra exposing (groupWhile)
 import Session exposing (Session(..))
 import Style.Dashboard as Style
 
@@ -74,13 +76,19 @@ type alias Model =
     }
 
 
-type alias Transaction =
+type alias TransactionDetail =
     { amount : Float
     , categories : List String
     , date : String
     , name : String
     , pending : Bool
     }
+
+
+type Transaction
+    = Success (List TransactionDetail)
+    | TransactionError Error
+    | UnknownTransactionStatus
 
 
 type alias Category =
@@ -105,15 +113,62 @@ type alias BudgetItem =
     }
 
 
+type ErrorCode
+    = ItemLoginRequired
+    | UnknownError
+
+
 type alias Error =
-    { code : String
+    { code : ErrorCode
     , message : String
     }
 
 
+errorCodeFromString : String -> ErrorCode
+errorCodeFromString str =
+    case str of
+        "ITEM_LOGIN_REQUIRED" ->
+            ItemLoginRequired
+
+        _ ->
+            UnknownError
+
+
 transactionDecoder : Decode.Decoder Transaction
 transactionDecoder =
-    Decode.succeed Transaction
+    Decode.oneOf
+        [ transactionErrorDecoder
+            |> Decode.andThen
+                (\err ->
+                    Decode.succeed (TransactionError err)
+                )
+        , Decode.field "transactions" (Decode.list transactionDetailDecoder)
+            |> Decode.andThen
+                (\transactions ->
+                    Decode.succeed (Success transactions)
+                )
+        , Decode.succeed UnknownTransactionStatus
+        ]
+
+
+transactionErrorDecoder : Decode.Decoder Error
+transactionErrorDecoder =
+    Decode.at [ "error", "code" ] Decode.string
+        |> Decode.andThen
+            (\str ->
+                let
+                    code =
+                        errorCodeFromString str
+                in
+                Decode.succeed Error
+                    |> hardcoded code
+                    |> requiredAt [ "error", "message" ] Decode.string
+            )
+
+
+transactionDetailDecoder : Decode.Decoder TransactionDetail
+transactionDetailDecoder =
+    Decode.succeed TransactionDetail
         |> required "amount" Decode.float
         |> required "category" (Decode.list Decode.string)
         |> required "date" Decode.string
@@ -164,9 +219,20 @@ budgetItemDecoder categories =
 
 errorDecoder : Decode.Decoder Error
 errorDecoder =
-    Decode.succeed Error
-        |> required "code" Decode.string
-        |> required "message" Decode.string
+    Decode.oneOf
+        [ Decode.field "code" Decode.string
+        , Decode.at [ "error", "code" ] Decode.string
+        ]
+        |> Decode.andThen
+            (\str ->
+                let
+                    code =
+                        errorCodeFromString str
+                in
+                Decode.succeed Error
+                    |> hardcoded code
+                    |> required "message" Decode.string
+            )
 
 
 
@@ -219,9 +285,6 @@ update msg model =
 
         LinkResponseMsg response ->
             let
-                _ =
-                    Debug.log "Response" response
-
                 token =
                     Session.accessToken model.session
             in
@@ -275,22 +338,12 @@ update msg model =
                 Ok ( transactions, _ ) ->
                     ( { model | transactions = transactions }, Cmd.none )
 
-                Err error ->
-                    case error of
-                        Http.Detailed.BadStatus metadata body statusCode ->
-                            let
-                                decodedError =
-                                    Decode.decodeString errorDecoder body
-                            in
-                            case decodedError of
-                                Ok apiError ->
-                                    ( { model | errors = apiError :: model.errors }, Cmd.none )
-
-                                Err _ ->
-                                    ( model, Cmd.none )
-
-                        _ ->
-                            ( model, Cmd.none )
+                Err err ->
+                    let
+                        x =
+                            Debug.log "error" err
+                    in
+                    ( model, Cmd.none )
 
         GotCategories response ->
             case response of
@@ -381,11 +434,33 @@ searchCategories search token =
         }
 
 
+
+-- Helpers
+
+
 categoryText : Category -> String
 categoryText category =
     List.reverse category.hierarchy
         |> List.head
         |> Maybe.withDefault ""
+
+
+transactionDetails : List Transaction -> List TransactionDetail
+transactionDetails transactions =
+    List.filterMap
+        (\t ->
+            case t of
+                Success details ->
+                    Just details
+
+                TransactionError _ ->
+                    Nothing
+
+                UnknownTransactionStatus ->
+                    Nothing
+        )
+        transactions
+        |> List.concat
 
 
 
@@ -408,8 +483,8 @@ accountsPane accounts =
         ]
 
 
-transactionsPane : List Transaction -> Html Msg
-transactionsPane transactions =
+transactionsPane : Model -> Html Msg
+transactionsPane model =
     div [] <|
         List.map
             (\transaction ->
@@ -418,7 +493,7 @@ transactionsPane transactions =
                     , span [] [ text (String.fromFloat transaction.amount) ]
                     ]
             )
-            transactions
+            (transactionDetails model.transactions)
 
 
 addNewGroupView : Model -> Html Msg
@@ -530,13 +605,13 @@ snapshotView model =
                 [ text "$15,000" ]
             ]
         , div [ css Style.snapshotEntryContainer, css Style.snapshotIncomeSpending ]
-            [ div []
+            [ div [ css Style.snapshotEntry ]
                 [ h6 [ css Style.snapshotEntryHeading ]
                     [ text "Income" ]
                 , span [ css Style.snapshotEntryValue ]
                     [ text "$1,500" ]
                 ]
-            , div []
+            , div [ css Style.snapshotEntry ]
                 [ h6 [ css Style.snapshotEntryHeading ]
                     [ text "Spending" ]
                 , span [ css Style.snapshotEntryValue ]
@@ -556,11 +631,13 @@ view model =
 
         LoggedIn _ data ->
             div [ css Style.budgetContainer ]
-                [ snapshotView model
+                [ div []
+                    [ Button.primary [ onClick StartLink ] [ text "Add account" ] ]
+                , snapshotView model
+                , transactionsPane model
 
                 -- budgetGroupListView model
                 -- , accountsPane data.accounts
-                -- , transactionsPane model.transactions
                 ]
 
 

@@ -27,6 +27,7 @@ type alias Item =
     { id : String
     , itemId : String
     , accessToken : String
+    , publicToken: String
     }
 
 
@@ -209,10 +210,11 @@ userDecoder =
 
 itemDecoder : Decode.Decoder Item
 itemDecoder =
-    Decode.map3 Item
-        (field "id" string)
-        (field "itemId" string)
-        (field "accessToken" string)
+    Decode.succeed Item
+        |> required "id" string
+        |> required "itemId" string
+        |> required "accessToken" string
+        |> required "publicToken" string
 
 
 balanceDecoder : Decode.Decoder Balance

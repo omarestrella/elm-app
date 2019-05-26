@@ -1,4 +1,4 @@
-module Style.Dashboard exposing (addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, snapshotBalance, snapshotContainer, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending)
+module Style.Dashboard exposing (addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, snapshotBalance, snapshotContainer, snapshotEntry, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending)
 
 import Css exposing (..)
 
@@ -31,7 +31,7 @@ addNewBudgetGroup =
 
 snapshotContainer =
     [ displayFlex
-    , boxShadow4 (px 0) (px 0) (px 6) (rgba 0 0 0 0.3)
+    , boxShadow4 (px 0) (px 0) (px 8) (rgba 0 0 0 0.2)
     , padding (px 20)
     , borderRadius (px 8)
     , backgroundColor (hex "fff")
@@ -45,10 +45,15 @@ snapshotEntryContainer =
     ]
 
 
+snapshotEntry =
+    [ marginBottom (rem 0.5) ]
+
+
 snapshotEntryHeading =
     [ color (hex "#aaaaaa")
     , fontSize (em 0.9)
     , fontWeight bold
+    , marginBottom (rem 0.3)
     ]
 
 
