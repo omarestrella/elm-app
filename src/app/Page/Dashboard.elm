@@ -138,15 +138,9 @@ transactionDecoder : Decode.Decoder Transaction
 transactionDecoder =
     Decode.oneOf
         [ transactionErrorDecoder
-            |> Decode.andThen
-                (\err ->
-                    Decode.succeed (TransactionError err)
-                )
+            |> Decode.map TransactionError
         , Decode.field "transactions" (Decode.list transactionDetailDecoder)
-            |> Decode.andThen
-                (\transactions ->
-                    Decode.succeed (Success transactions)
-                )
+            |> Decode.map Success
         , Decode.succeed UnknownTransactionStatus
         ]
 
@@ -293,7 +287,7 @@ update msg model =
                     case linkData of
                         LinkSuccess link ->
                             ( model
-                            , Session.linkItemToUser HandleItemLink token link.publicToken
+                            , Session.linkItemToUser HandleItemLink token link
                             )
 
                         LinkError errors ->
@@ -340,7 +334,7 @@ update msg model =
 
                 Err err ->
                     let
-                        x =
+                        error =
                             Debug.log "error" err
                     in
                     ( model, Cmd.none )

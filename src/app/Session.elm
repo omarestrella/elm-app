@@ -6,6 +6,7 @@ import Http
 import Json.Decode as Decode exposing (field, int, list, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required)
 import Json.Encode as Encode
+import Link exposing (Link)
 import Url.Builder as Builder exposing (Root(..))
 
 
@@ -27,7 +28,7 @@ type alias Item =
     { id : String
     , itemId : String
     , accessToken : String
-    , publicToken: String
+    , publicToken : String
     }
 
 
@@ -130,12 +131,22 @@ getSession msg token =
         }
 
 
-linkItemToUser : (Result Http.Error Item -> msg) -> String -> String -> Cmd msg
-linkItemToUser msg token publicToken =
+linkItemToUser : (Result Http.Error Item -> msg) -> String -> Link -> Cmd msg
+linkItemToUser msg token link =
     let
+        accountEncoder =
+            \account ->
+                Encode.object
+                    [ ( "id", Encode.string account.id )
+                    , ( "name", Encode.string account.name )
+                    , ( "mask", Encode.string account.mask )
+                    ]
+
         body =
             Encode.object
-                [ ( "publicToken", Encode.string publicToken )
+                [ ( "publicToken", Encode.string link.publicToken )
+                , ( "institutionId", Encode.string link.institution.institutionId )
+                , ( "accounts", Encode.list accountEncoder link.accounts )
                 ]
     in
     Api.request
