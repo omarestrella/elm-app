@@ -29,6 +29,7 @@ type alias Item =
     , itemId : String
     , accessToken : String
     , publicToken : String
+    , accounts : List ItemAccount
     }
 
 
@@ -37,6 +38,17 @@ type alias Balance =
     , current : Float
     , isoCurrencyCode : String
     , limit : Maybe Float
+    }
+
+
+type alias ItemAccount =
+    -- An ItemAccount is a short form of the larger account
+    -- model
+    { id : String
+    , accountId : String
+    , name : String
+    , mask : String
+    , itemId : String
     }
 
 
@@ -226,6 +238,17 @@ itemDecoder =
         |> required "itemId" string
         |> required "accessToken" string
         |> required "publicToken" string
+        |> required "accounts" (list itemAccountDecoder)
+
+
+itemAccountDecoder : Decode.Decoder ItemAccount
+itemAccountDecoder =
+    Decode.succeed ItemAccount
+        |> required "id" string
+        |> required "accountId" string
+        |> required "name" string
+        |> required "mask" string
+        |> required "itemId" string
 
 
 balanceDecoder : Decode.Decoder Balance

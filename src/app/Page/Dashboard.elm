@@ -4,7 +4,7 @@ import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
 import Component.Input as Input
 import Date exposing (Date)
-import Html.Styled exposing (Html, a, button, div, form, h6, input, label, li, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Styled exposing (Html, a, button, div, form, h4, h5, h6, input, label, li, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
@@ -457,6 +457,15 @@ transactionDetails transactions =
         |> List.concat
 
 
+groupedTransactions : List Transaction -> List ( TransactionDetail, List TransactionDetail )
+groupedTransactions transactions =
+    transactionDetails transactions
+        |> List.Extra.groupWhile
+            (\a b ->
+                a.date == b.date
+            )
+
+
 
 -- View
 
@@ -477,17 +486,34 @@ accountsPane accounts =
         ]
 
 
+transactionDetailsView : TransactionDetail -> Html Msg
+transactionDetailsView transaction =
+    div [ css Style.transactionDetail ]
+        [ div [ css Style.transactionDetailNameCategory ]
+            [ span [ css Style.transactionDetailName ]
+                [ text transaction.name ]
+            , span [ css Style.transactionDetailCategory ]
+                [ text (List.head transaction.categories |> Maybe.withDefault "") ]
+            ]
+        , span [ css Style.transactionDetailAmount ]
+            [ text (String.fromFloat transaction.amount) ]
+        ]
+
+
 transactionsPane : Model -> Html Msg
 transactionsPane model =
-    div [] <|
+    div [ class "transactions-pane" ] <|
         List.map
-            (\transaction ->
-                div []
-                    [ span [] [ text transaction.name ]
-                    , span [] [ text (String.fromFloat transaction.amount) ]
+            (\( transactionGroup, transactions ) ->
+                div [ css Style.transactionGroup ]
+                    [ h5 [ css Style.transactionGroupTitle ] [ text transactionGroup.date ]
+                    , div [ css Style.transactionGroupDetail ] <|
+                        List.map
+                            transactionDetailsView
+                            ([ transactionGroup ] ++ transactions)
                     ]
             )
-            (transactionDetails model.transactions)
+            (groupedTransactions model.transactions)
 
 
 addNewGroupView : Model -> Html Msg
