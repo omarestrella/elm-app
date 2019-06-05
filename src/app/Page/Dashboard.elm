@@ -14,6 +14,7 @@ import Json.Decode.Pipeline exposing (hardcoded, optional, required, requiredAt,
 import Json.Encode as Encode
 import Link exposing (LinkResponse(..), linkResponseDecoder)
 import List.Extra exposing (groupWhile)
+import Money exposing (currencyCodeToSymbol, stringToCurrencyCode)
 import Session exposing (Session(..))
 import Style.Dashboard as Style
 
@@ -82,6 +83,7 @@ type alias TransactionDetail =
     , date : String
     , name : String
     , pending : Bool
+    , currencyCode : String
     }
 
 
@@ -168,6 +170,7 @@ transactionDetailDecoder =
         |> required "date" Decode.string
         |> required "name" Decode.string
         |> required "pending" Decode.bool
+        |> required "iso_currency_code" Decode.string
 
 
 categoryDecoder : Decode.Decoder Category
@@ -291,11 +294,11 @@ update msg model =
                             )
 
                         LinkError errors ->
-                            -- TODO: graceful error handling
+                            -- MARK: graceful error handling
                             ( model, Cmd.none )
 
                 Err _ ->
-                    -- TODO: graceful error handling
+                    -- MARK: graceful error handling
                     ( model, Cmd.none )
 
         HandleItemLink response ->
@@ -334,7 +337,7 @@ update msg model =
 
                 Err err ->
                     let
-                        error =
+                        _ =
                             Debug.log "error" err
                     in
                     ( model, Cmd.none )
@@ -466,6 +469,16 @@ groupedTransactions transactions =
             )
 
 
+transactionAmount : TransactionDetail -> String
+transactionAmount transaction =
+    let
+        symbol =
+            stringToCurrencyCode transaction.currencyCode
+                |> currencyCodeToSymbol
+    in
+    String.join "" [ symbol, String.fromFloat transaction.amount ]
+
+
 
 -- View
 
@@ -496,7 +509,7 @@ transactionDetailsView transaction =
                 [ text (List.head transaction.categories |> Maybe.withDefault "") ]
             ]
         , span [ css Style.transactionDetailAmount ]
-            [ text (String.fromFloat transaction.amount) ]
+            [ text (transactionAmount transaction) ]
         ]
 
 
@@ -510,7 +523,7 @@ transactionsPane model =
                     , div [ css Style.transactionGroupDetail ] <|
                         List.map
                             transactionDetailsView
-                            ([ transactionGroup ] ++ transactions)
+                            (transactionGroup :: transactions)
                     ]
             )
             (groupedTransactions model.transactions)

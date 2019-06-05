@@ -1,6 +1,7 @@
 module Style.Dashboard exposing (addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, columnDisplay, snapshotBalance, snapshotContainer, snapshotEntry, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending, transactionDetail, transactionDetailAmount, transactionDetailCategory, transactionDetailName, transactionDetailNameCategory, transactionGroup, transactionGroupDetail, transactionGroupTitle)
 
 import Css exposing (..)
+import Css.Media exposing (maxWidth, only, screen, withMedia)
 
 
 columnDisplay =
@@ -14,6 +15,8 @@ budgetContainer =
     , flexDirection column
     , padding (px 20)
     , width (pct 60)
+    , withMedia [ only screen [ maxWidth (px 600) ] ]
+        [ width (pct 100) ]
     ]
 
 
