@@ -3,8 +3,8 @@ port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkRe
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
 import Component.Input as Input
-import Date exposing (Date)
-import Html.Styled exposing (Html, a, button, div, form, h4, h5, h6, input, label, li, span, table, tbody, td, text, th, thead, tr, ul)
+import Dates exposing (DateRange(..), dateRangeToString, dateSelector, stringToDateRange)
+import Html.Styled exposing (Html, a, button, div, form, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
@@ -15,6 +15,7 @@ import Json.Encode as Encode
 import Link exposing (LinkResponse(..), linkResponseDecoder)
 import List.Extra exposing (groupWhile)
 import Money exposing (currencyCodeToSymbol, stringToCurrencyCode)
+import Round exposing (round)
 import Session exposing (Session(..))
 import Style.Dashboard as Style
 
@@ -32,6 +33,7 @@ type Msg
     | GotAccounts (Result Http.Error (List Session.Account))
     | GotCategories (Result Http.Error (List Category))
     | GotTransactions (Result (Http.Detailed.Error String) ( List Transaction, Http.Metadata ))
+    | ChangeDateRange String
 
 
 type CategoryState
@@ -62,6 +64,7 @@ defaultModel session =
     , budgetGroups = []
     , newBudgetGroup = None
     , errors = []
+    , transactionDateRange = ThisMonth
     }
 
 
@@ -74,6 +77,7 @@ type alias Model =
     , budgetGroups : List BudgetGroup
     , newBudgetGroup : NewBudgetGroup
     , errors : List Error
+    , transactionDateRange : DateRange
     }
 
 
@@ -257,7 +261,7 @@ bootstrap session =
 
         transactionsCmd =
             if haveAccountTokens then
-                loadTransactions token accountTokens
+                loadTransactions token accountTokens Nothing
 
             else
                 Cmd.none
@@ -378,15 +382,30 @@ update msg model =
         SubmitNewBudgetGroup name ->
             ( { model | budgetGroups = model.budgetGroups ++ [ { id = "", name = name, items = [] } ] }, Cmd.none )
 
+        ChangeDateRange value ->
+            let
+                range =
+                    stringToDateRange value
+
+                token =
+                    Session.accessToken model.session
+
+                accountTokens =
+                    Session.accountTokens model.session
+            in
+            ( { model | transactionDateRange = range }
+            , loadTransactions token accountTokens (Just range)
+            )
+
         NoOp ->
             ( model, Cmd.none )
 
 
-loadTransactions : String -> List String -> Cmd Msg
-loadTransactions token accessTokens =
+loadTransactions : String -> List String -> Maybe DateRange -> Cmd Msg
+loadTransactions token accessTokens possibleRange =
     let
         url =
-            Api.accessTokensUrl accessTokens "transactions"
+            Api.dateRangeUrl accessTokens "transactions" possibleRange
     in
     Api.request
         { url = url
@@ -476,7 +495,7 @@ transactionAmount transaction =
             stringToCurrencyCode transaction.currencyCode
                 |> currencyCodeToSymbol
     in
-    String.join "" [ symbol, String.fromFloat transaction.amount ]
+    String.join "" [ symbol, round 2 (abs transaction.amount) ]
 
 
 
@@ -508,25 +527,39 @@ transactionDetailsView transaction =
             , span [ css Style.transactionDetailCategory ]
                 [ text (List.head transaction.categories |> Maybe.withDefault "") ]
             ]
-        , span [ css Style.transactionDetailAmount ]
+        , span
+            [ css Style.transactionDetailAmount
+            , css (Style.transactionDetailAmountColor transaction)
+            ]
             [ text (transactionAmount transaction) ]
         ]
 
 
+transactionsDateRangeView : Html Msg
+transactionsDateRangeView =
+    dateSelector
+        [ ThisMonth, LastMonth, Last30Days, Last90Days ]
+        ChangeDateRange
+
+
 transactionsPane : Model -> Html Msg
 transactionsPane model =
-    div [ class "transactions-pane" ] <|
-        List.map
-            (\( transactionGroup, transactions ) ->
-                div [ css Style.transactionGroup ]
-                    [ h5 [ css Style.transactionGroupTitle ] [ text transactionGroup.date ]
-                    , div [ css Style.transactionGroupDetail ] <|
-                        List.map
-                            transactionDetailsView
-                            (transactionGroup :: transactions)
-                    ]
-            )
-            (groupedTransactions model.transactions)
+    div [ class "transactions-pane" ]
+        [ div []
+            [ transactionsDateRangeView ]
+        , div [] <|
+            List.map
+                (\( transactionGroup, transactions ) ->
+                    div [ css Style.transactionGroup ]
+                        [ h5 [ css Style.transactionGroupTitle ] [ text transactionGroup.date ]
+                        , div [ css Style.transactionGroupDetail ] <|
+                            List.map
+                                transactionDetailsView
+                                (transactionGroup :: transactions)
+                        ]
+                )
+                (groupedTransactions model.transactions)
+        ]
 
 
 addNewGroupView : Model -> Html Msg

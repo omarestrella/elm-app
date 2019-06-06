@@ -1,4 +1,4 @@
-module Style.Dashboard exposing (addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, columnDisplay, snapshotBalance, snapshotContainer, snapshotEntry, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending, transactionDetail, transactionDetailAmount, transactionDetailCategory, transactionDetailName, transactionDetailNameCategory, transactionGroup, transactionGroupDetail, transactionGroupTitle)
+module Style.Dashboard exposing (addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, columnDisplay, snapshotBalance, snapshotContainer, snapshotEntry, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending, transactionDetail, transactionDetailAmount, transactionDetailAmountColor, transactionDetailCategory, transactionDetailName, transactionDetailNameCategory, transactionGroup, transactionGroupDetail, transactionGroupTitle)
 
 import Css exposing (..)
 import Css.Media exposing (maxWidth, only, screen, withMedia)
@@ -136,3 +136,11 @@ transactionDetailCategory =
 
 transactionDetailAmount =
     [ fontSize (em 0.9) ]
+
+
+transactionDetailAmountColor transaction =
+    if transaction.amount > 0 then
+        [ color (hex "#f73650") ]
+
+    else
+        [ color (hex "#6ee853") ]
