@@ -16,22 +16,13 @@ type DateRange
 
 
 type alias DateRangeQuery =
-    { start : String
-    , end : String
+    { start : Int
+    , end : Int
     }
 
 
 
 -- Internal
-
-
-queryDateString : Int -> Int -> Int -> String
-queryDateString year month day =
-    String.fromInt year
-        ++ "-"
-        ++ String.fromInt month
-        ++ "-"
-        ++ String.fromInt day
 
 
 monthToInt : Time.Month -> Int
@@ -129,9 +120,10 @@ dateRangeToLabel range =
             "Last 90 days"
 
 
-dateRangeToQuery : DateRange -> Zone -> Posix -> DateRangeQuery
-dateRangeToQuery range zone baseTime =
+dateRangeToQuery : DateRange -> Posix -> DateRangeQuery
+dateRangeToQuery range baseTime =
     let
+        zone = Time.utc
         toYear =
             Time.toYear zone
 
@@ -140,15 +132,11 @@ dateRangeToQuery range zone baseTime =
 
         toDay =
             Time.toDay zone
-
-        format =
-            \posix ->
-                queryDateString (toYear posix) (toMonth posix) (toDay posix)
     in
     case range of
         ThisMonth ->
-            { start = Calendar.getFirstDayOfMonth zone baseTime |> format
-            , end = Calendar.getLastDayOfMonth zone baseTime |> format
+            { start = Calendar.getFirstDayOfMonth zone baseTime |> Time.posixToMillis
+            , end = Calendar.getLastDayOfMonth zone baseTime |> Time.posixToMillis
             }
 
         LastMonth ->
@@ -156,8 +144,8 @@ dateRangeToQuery range zone baseTime =
                 date =
                     Delta.addMonths -1 zone baseTime
             in
-            { start = Calendar.getFirstDayOfMonth zone date |> format
-            , end = Calendar.getLastDayOfMonth zone date |> format
+            { start = Calendar.getFirstDayOfMonth zone date |> Time.posixToMillis
+            , end = Calendar.getLastDayOfMonth zone date |> Time.posixToMillis
             }
 
         Last30Days ->
@@ -165,8 +153,8 @@ dateRangeToQuery range zone baseTime =
                 date =
                     Delta.addDays -30 baseTime
             in
-            { start = Calendar.getFirstDayOfMonth zone date |> format
-            , end = baseTime |> format
+            { start = Calendar.getFirstDayOfMonth zone date |> Time.posixToMillis
+            , end = baseTime |> Time.posixToMillis
             }
 
         Last90Days ->
@@ -174,8 +162,8 @@ dateRangeToQuery range zone baseTime =
                 date =
                     Delta.addDays -90 baseTime
             in
-            { start = Calendar.getFirstDayOfMonth zone date |> format
-            , end = baseTime |> format
+            { start = Calendar.getFirstDayOfMonth zone date |> Time.posixToMillis
+            , end = baseTime |> Time.posixToMillis
             }
 
 

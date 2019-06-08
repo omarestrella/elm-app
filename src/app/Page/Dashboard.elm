@@ -28,6 +28,7 @@ type Msg
     | LinkResponseMsg (Result Decode.Error LinkResponse)
     | HandleItemLink (Result Http.Error Session.Item)
     | LoadData
+    | LoadTransactionsForTime String (List String) Posix
     | UpdateBudgetGroup String
     | ClearBudgetGroup
     | SubmitNewBudgetGroup String
@@ -269,7 +270,7 @@ bootstrap session =
 
         transactionsCmd =
             if haveAccountTokens then
-                loadTransactions token accountTokens "" ""
+                Task.perform (LoadTransactionsForTime token accountTokens) Time.now
 
             else
                 Cmd.none
@@ -278,7 +279,6 @@ bootstrap session =
         [ accountsCmd
         , transactionsCmd
         , loadCategories token
-        , Task.perform GotCurrentTime Time.now
         , Task.perform GotCurrentZone Time.here
         ]
 
@@ -404,9 +404,18 @@ update msg model =
                     Session.accountTokens model.session
 
                 date =
-                    dateRangeToQuery range model.currentZone model.currentTime
+                    dateRangeToQuery range model.currentTime
             in
             ( { model | transactionDateRange = range }
+            , loadTransactions token accountTokens date.start date.end
+            )
+
+        LoadTransactionsForTime token accountTokens time ->
+            let
+                date =
+                    dateRangeToQuery model.transactionDateRange time
+            in
+            ( { model | currentTime = time }
             , loadTransactions token accountTokens date.start date.end
             )
 
@@ -420,7 +429,7 @@ update msg model =
             ( model, Cmd.none )
 
 
-loadTransactions : String -> List String -> String -> String -> Cmd Msg
+loadTransactions : String -> List String -> Int -> Int -> Cmd Msg
 loadTransactions token accessTokens start end =
     let
         url =

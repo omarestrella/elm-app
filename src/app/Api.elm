@@ -43,12 +43,12 @@ accessTokensUrl tokens base =
     Builder.absolute [ base ] (List.map (Builder.string "accessToken") tokens)
 
 
-dateRangeUrl : List String -> String -> String -> String -> String
+dateRangeUrl : List String -> String -> Int -> Int -> String
 dateRangeUrl tokens base start end =
     Builder.absolute
         [ base ]
         (List.map (Builder.string "accessToken") tokens
-            ++ [ Builder.string "start" start, Builder.string "end" end ]
+            ++ [ Builder.int "start" start, Builder.int "end" end ]
         )
 
 
