@@ -3,7 +3,7 @@ port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkRe
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
 import Component.Input as Input
-import Dates exposing (DateRange(..), dateRangeToString, dateSelector, stringToDateRange)
+import Dates exposing (DateRange(..), dateRangeToQuery, dateRangeToString, dateSelector, stringToDateRange)
 import Html.Styled exposing (Html, a, button, div, form, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
@@ -18,6 +18,8 @@ import Money exposing (currencyCodeToSymbol, stringToCurrencyCode)
 import Round exposing (round)
 import Session exposing (Session(..))
 import Style.Dashboard as Style
+import Task
+import Time exposing (Posix, Zone)
 
 
 type Msg
@@ -34,6 +36,8 @@ type Msg
     | GotCategories (Result Http.Error (List Category))
     | GotTransactions (Result (Http.Detailed.Error String) ( List Transaction, Http.Metadata ))
     | ChangeDateRange String
+    | GotCurrentTime Posix
+    | GotCurrentZone Zone
 
 
 type CategoryState
@@ -65,6 +69,8 @@ defaultModel session =
     , newBudgetGroup = None
     , errors = []
     , transactionDateRange = ThisMonth
+    , currentTime = Time.millisToPosix 0
+    , currentZone = Time.utc
     }
 
 
@@ -78,6 +84,8 @@ type alias Model =
     , newBudgetGroup : NewBudgetGroup
     , errors : List Error
     , transactionDateRange : DateRange
+    , currentTime : Posix
+    , currentZone : Zone
     }
 
 
@@ -261,7 +269,7 @@ bootstrap session =
 
         transactionsCmd =
             if haveAccountTokens then
-                loadTransactions token accountTokens Nothing
+                loadTransactions token accountTokens "" ""
 
             else
                 Cmd.none
@@ -270,6 +278,8 @@ bootstrap session =
         [ accountsCmd
         , transactionsCmd
         , loadCategories token
+        , Task.perform GotCurrentTime Time.now
+        , Task.perform GotCurrentZone Time.here
         ]
 
 
@@ -392,20 +402,29 @@ update msg model =
 
                 accountTokens =
                     Session.accountTokens model.session
+
+                date =
+                    dateRangeToQuery range model.currentZone model.currentTime
             in
             ( { model | transactionDateRange = range }
-            , loadTransactions token accountTokens (Just range)
+            , loadTransactions token accountTokens date.start date.end
             )
+
+        GotCurrentTime time ->
+            ( { model | currentTime = time }, Cmd.none )
+
+        GotCurrentZone zone ->
+            ( { model | currentZone = zone }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
 
 
-loadTransactions : String -> List String -> Maybe DateRange -> Cmd Msg
-loadTransactions token accessTokens possibleRange =
+loadTransactions : String -> List String -> String -> String -> Cmd Msg
+loadTransactions token accessTokens start end =
     let
         url =
-            Api.dateRangeUrl accessTokens "transactions" possibleRange
+            Api.dateRangeUrl accessTokens "transactions" start end
     in
     Api.request
         { url = url

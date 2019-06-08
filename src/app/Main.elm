@@ -14,8 +14,9 @@ import Page.Auth as Auth
 import Page.Dashboard as Dashboard
 import Routing exposing (..)
 import Session exposing (Session(..), SessionData, getSession)
-import Url exposing (Url)
 import Task
+import Time exposing (Zone)
+import Url exposing (Url)
 
 
 
@@ -31,6 +32,7 @@ type alias AppModel =
     { currentRoute : Route
     , pageModel : PageModel
     , session : Session
+    , timezone : Zone
     }
 
 
@@ -46,6 +48,7 @@ type Msg
     | GotSession String (Result Http.Error Session.User)
     | GotAuthMsg Auth.Msg
     | GotDashboardMsg Dashboard.Msg
+    | GotTimezone Zone
 
 
 init : Maybe String -> Url -> Navigation.Key -> ( Model, Cmd Msg )
@@ -60,6 +63,7 @@ init accessToken url key =
                 { currentRoute = AuthRoute
                 , pageModel = Auth (Auth.defaultModel guestSession)
                 , session = guestSession
+                , timezone = Time.utc
                 }
             , Navigation.pushUrl key (routePath AuthRoute)
             )
@@ -141,6 +145,7 @@ update msg model =
                                     { currentRoute = DashboardRoute
                                     , pageModel = Dashboard (Dashboard.defaultModel authSession)
                                     , session = authSession
+                                    , timezone = Time.utc
                                     }
 
                                 accountTokens =
@@ -151,24 +156,28 @@ update msg model =
                                 [ Routing.routeTo DashboardRoute authSession
                                 , Storage.set "accessToken" token
                                 , Dashboard.bootstrap authSession |> Cmd.map GotDashboardMsg
+                                , Task.perform GotTimezone Time.here
                                 ]
                             )
 
                         Err err ->
                             let
-                                _ =
-                                    Debug.log "Err" err
-
                                 appModel =
                                     { currentRoute = AuthRoute
                                     , pageModel = Auth (Auth.defaultModel guestSession)
                                     , session = guestSession
+                                    , timezone = Time.utc
                                     }
                             in
-                            ( Ready appModel, Routing.routeTo AuthRoute guestSession )
+                            ( Ready appModel
+                            , Cmd.batch
+                                [ Routing.routeTo AuthRoute guestSession
+                                , Task.perform GotTimezone Time.here
+                                ]
+                            )
 
                 _ ->
-                    ( model, Cmd.none )
+                    ( model, Task.perform GotTimezone Time.here )
 
         Ready appModel ->
             let
@@ -226,6 +235,9 @@ readyUpdate msg model navKey =
 
                 External url ->
                     ( Ready model, Navigation.load url )
+
+        ( GotTimezone zone, _ ) ->
+            ( Ready { model | timezone = zone }, Cmd.none )
 
         -- The following do nothing
         ( NoOp, _ ) ->
