@@ -3,7 +3,8 @@ port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkRe
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
 import Component.Input as Input
-import Dates exposing (DateRange(..), dateRangeToQuery, dateRangeToString, dateSelector, stringToDateRange)
+import DateFormat.Relative exposing (relativeTime)
+import Dates exposing (DateRange(..), dateRangeToQuery, dateRangeToString, dateSelector, formattedTransactionGroupDate, stringToDateRange)
 import Html.Styled exposing (Html, a, button, div, form, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
@@ -570,6 +571,26 @@ transactionsDateRangeView =
         ChangeDateRange
 
 
+transactionsGroupView : List TransactionDetail -> Html Msg
+transactionsGroupView transactions =
+    let
+        date =
+            List.head transactions
+                |> Maybe.andThen
+                    (\t ->
+                        Just (formattedTransactionGroupDate t.date)
+                    )
+                |> Maybe.withDefault ""
+    in
+    div [ css Style.transactionGroup ]
+        [ h5 [ css Style.transactionGroupTitle ] [ text date ]
+        , div [ css Style.transactionGroupDetail ] <|
+            List.map
+                transactionDetailsView
+                transactions
+        ]
+
+
 transactionsPane : Model -> Html Msg
 transactionsPane model =
     div [ class "transactions-pane" ]
@@ -578,13 +599,7 @@ transactionsPane model =
         , div [] <|
             List.map
                 (\( transactionGroup, transactions ) ->
-                    div [ css Style.transactionGroup ]
-                        [ h5 [ css Style.transactionGroupTitle ] [ text transactionGroup.date ]
-                        , div [ css Style.transactionGroupDetail ] <|
-                            List.map
-                                transactionDetailsView
-                                (transactionGroup :: transactions)
-                        ]
+                    transactionsGroupView (transactionGroup :: transactions)
                 )
                 (groupedTransactions model.transactions)
         ]

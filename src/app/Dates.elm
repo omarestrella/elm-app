@@ -1,10 +1,14 @@
-module Dates exposing (DateRange(..), dateRangeToLabel, dateRangeToQuery, dateRangeToString, dateSelector, stringToDateRange)
+module Dates exposing (DateRange(..), dateRangeToLabel, dateRangeToQuery, dateRangeToString, dateSelector, formattedTransactionGroupDate, stringToDateRange)
 
+import DateFormat
 import Derberos.Date.Calendar as Calendar
+import Derberos.Date.Core as Core
 import Derberos.Date.Delta as Delta
+import Derberos.Date.Utils as Utils
 import Html.Styled exposing (Html, option, select, text)
 import Html.Styled.Attributes exposing (value)
 import Html.Styled.Events exposing (onInput)
+import Iso8601
 import Time exposing (Month(..), Posix, Zone)
 
 
@@ -65,6 +69,33 @@ monthToInt month =
             12
 
 
+stringToPosix : String -> Posix
+stringToPosix string =
+    let
+        possibleDate =
+            Iso8601.toTime string
+    in
+    case possibleDate of
+        Ok posix ->
+            let
+                year =
+                    posix |> Time.toYear Time.utc
+
+                month =
+                    posix |> Time.toMonth Time.utc |> monthToInt
+
+                day =
+                    posix |> Time.toDay Time.utc
+
+                record =
+                    Core.newDateRecord year month day 0 0 0 0 Time.utc
+            in
+            Core.civilToPosix record
+
+        Err _ ->
+            Time.millisToPosix 0
+
+
 
 -- Helpers
 
@@ -123,7 +154,9 @@ dateRangeToLabel range =
 dateRangeToQuery : DateRange -> Posix -> DateRangeQuery
 dateRangeToQuery range baseTime =
     let
-        zone = Time.utc
+        zone =
+            Time.utc
+
         toYear =
             Time.toYear zone
 
@@ -165,6 +198,23 @@ dateRangeToQuery range baseTime =
             { start = Calendar.getFirstDayOfMonth zone date |> Time.posixToMillis
             , end = baseTime |> Time.posixToMillis
             }
+
+
+formattedTransactionGroupDate : String -> String
+formattedTransactionGroupDate str =
+    let
+        date =
+            stringToPosix str
+    in
+    DateFormat.format
+        [ DateFormat.monthNameAbbreviated
+        , DateFormat.text " "
+        , DateFormat.dayOfMonthFixed
+        , DateFormat.text ", "
+        , DateFormat.yearNumber
+        ]
+        Time.utc
+        date
 
 
 
