@@ -1,4 +1,4 @@
-module Style.Dashboard exposing (addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, columnDisplay, snapshotBalance, snapshotContainer, snapshotEntry, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending, transactionDetail, transactionDetailAmount, transactionDetailAmountColor, transactionDetailCategory, transactionDetailName, transactionDetailNameCategory, transactionGroup, transactionGroupDetail, transactionGroupTitle)
+module Style.Dashboard exposing (addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, columnDisplay, snapshotBalance, snapshotChart, snapshotContainer, snapshotEntry, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending, transactionDetail, transactionDetailAmount, transactionDetailAmountColor, transactionDetailCategory, transactionDetailName, transactionDetailNameCategory, transactionGroup, transactionGroupDetail, transactionGroupTitle)
 
 import Css exposing (..)
 import Css.Media exposing (maxWidth, only, screen, withMedia)
@@ -76,6 +76,12 @@ snapshotBalance =
 
 snapshotIncomeSpending =
     [ flex (int 1) ]
+
+
+snapshotChart =
+    [ minWidth (px 100)
+    , Css.maxWidth (px 500)
+    ]
 
 
 transactionGroup =

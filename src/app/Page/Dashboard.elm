@@ -2,10 +2,11 @@ port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkRe
 
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
+import Component.Chart as Chart
 import Component.Input as Input
 import DateFormat.Relative exposing (relativeTime)
 import Dates exposing (DateRange(..), dateRangeToQuery, dateRangeToString, dateSelector, formattedTransactionGroupDate, stringToDateRange)
-import Html.Styled exposing (Html, a, button, div, form, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Styled exposing (Html, a, button, div, form, fromUnstyled, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
@@ -706,6 +707,10 @@ budgetGroupListView model =
 
 snapshotView : Model -> Html Msg
 snapshotView model =
+    let
+        money =
+            [ 1500, 1200 ]
+    in
     div [ css Style.snapshotContainer ]
         [ div [ css Style.snapshotEntryContainer, css Style.snapshotBalance ]
             [ h6 [ css Style.snapshotEntryHeading ]
@@ -727,8 +732,10 @@ snapshotView model =
                     [ text "$1,200" ]
                 ]
             ]
-        , div [ css Style.snapshotEntryContainer ]
-            [ text "[ chart? ]" ]
+        , div [ css Style.snapshotEntryContainer, css Style.snapshotChart ]
+            [ Chart.view money 150 150
+                |> fromUnstyled
+            ]
         ]
 
 

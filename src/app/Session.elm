@@ -52,13 +52,22 @@ type alias ItemAccount =
     }
 
 
+type AccountType
+    = Brokerage
+    | Credit
+    | Depository
+    | Loan
+    | Other
+    | UnknownAccountType
+
+
 type alias Account =
     { accountId : String
     , balances : Maybe Balance
     , name : String
     , mask : String
     , officialName : Maybe String
-    , type_ : String
+    , type_ : AccountType
     , subtype : String
     , institutionName : String
     }
@@ -69,6 +78,28 @@ type alias SessionData =
     , accessToken : String
     , accounts : List Account
     }
+
+
+accountTypeStringToValue : String -> AccountType
+accountTypeStringToValue str =
+    case str of
+        "brokerage" ->
+            Brokerage
+
+        "credit" ->
+            Credit
+
+        "depository" ->
+            Depository
+
+        "loan" ->
+            Loan
+
+        "other" ->
+            Other
+
+        _ ->
+            UnknownAccountType
 
 
 
@@ -130,6 +161,30 @@ accountTokens session =
 
         LoggedIn _ data ->
             List.map .accessToken data.user.items
+
+
+allAccounts : Session -> List Account
+allAccounts session =
+    case session of
+        Guest _ ->
+            []
+
+        LoggedIn _ data ->
+            data.accounts
+
+
+groupedAccounts : Session -> List ( AccountType, List Account )
+groupedAccounts session =
+    case session of
+        Guest _ ->
+            []
+
+        LoggedIn _ data ->
+            []
+
+
+
+-- API Requests
 
 
 getSession : (Result Http.Error User -> msg) -> String -> Cmd msg
@@ -262,15 +317,19 @@ balanceDecoder =
 
 accountDecoder : Decode.Decoder Account
 accountDecoder =
-    Decode.succeed Account
-        |> required "account_id" Decode.string
-        |> optional "balances" (Decode.maybe balanceDecoder) Nothing
-        |> required "name" Decode.string
-        |> required "mask" Decode.string
-        |> optional "official_name" (Decode.maybe Decode.string) Nothing
-        |> required "type" Decode.string
-        |> required "subtype" Decode.string
-        |> required "institution_name" Decode.string
+    Decode.field "type" Decode.string
+        |> Decode.andThen
+            (\type_ ->
+                Decode.succeed Account
+                    |> required "account_id" Decode.string
+                    |> optional "balances" (Decode.maybe balanceDecoder) Nothing
+                    |> required "name" Decode.string
+                    |> required "mask" Decode.string
+                    |> optional "official_name" (Decode.maybe Decode.string) Nothing
+                    |> hardcoded (accountTypeStringToValue type_)
+                    |> required "subtype" Decode.string
+                    |> required "institution_name" Decode.string
+            )
 
 
 decoder : Decode.Decoder User
