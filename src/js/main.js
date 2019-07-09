@@ -1,6 +1,4 @@
-import './main.css';
-import { Elm } from './app/Main.elm';
-import registerServiceWorker from './registerServiceWorker';
+import { Elm } from '../app/Main.elm';
 import { startAuth } from './auth';
 
 const app = Elm.Main.init({
@@ -30,5 +28,3 @@ app.ports.toStorage.subscribe(function (message) {
       console.warn('Received unhandled storage message:', message);
   }
 });
-
-registerServiceWorker();

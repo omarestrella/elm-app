@@ -1,0 +1,35 @@
+{
+  "name": "elm-ui",
+  "description": "Budgeting UI",
+  "version": "1.0.0",
+  "main": "src/index.html",
+  "private": true,
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "parcel": "^1.12.3"
+  },
+  "devDependencies": {
+    "elm-hot": "^1.1.0",
+    "less": "^3.9.0",
+    "node-elm-compiler": "^5.0.3",
+    "parcel-bundler": "^1.12.3",
+    "parcel-proxy-server": "^1.1.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "parcel": "node_modules/.bin/parcel src/index.html",
+    "test": "elm-test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omarestrella/elm-app.git"
+  },
+  "author": "Omar Estrella",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/omarestrella/elm-app/issues"
+  },
+  "homepage": "https://github.com/omarestrella/elm-app#readme"
+}
