@@ -6,6 +6,7 @@ import Component.Chart as Chart
 import Component.Input as Input
 import DateFormat.Relative exposing (relativeTime)
 import Dates exposing (DateRange(..), dateRangeToQuery, dateRangeToString, dateSelector, formattedTransactionGroupDate, stringToDateRange)
+import Error exposing (PlaidError, plaidErrorDecoder)
 import Html.Styled exposing (Html, a, button, div, form, fromUnstyled, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
@@ -18,7 +19,7 @@ import Link exposing (LinkResponse(..), linkResponseDecoder)
 import List.Extra exposing (groupWhile)
 import Money exposing (currencyCodeToSymbol, stringToCurrencyCode)
 import Round exposing (round)
-import Session exposing (Session(..))
+import Session exposing (Account, Session(..))
 import Style.Dashboard as Style
 import Task
 import Time exposing (Posix, Zone)
@@ -70,7 +71,6 @@ defaultModel session =
     , categories = Default []
     , budgetGroups = []
     , newBudgetGroup = None
-    , errors = []
     , transactionDateRange = ThisMonth
     , currentTime = Time.millisToPosix 0
     , currentZone = Time.utc
@@ -85,7 +85,6 @@ type alias Model =
     , categories : CategoryState
     , budgetGroups : List BudgetGroup
     , newBudgetGroup : NewBudgetGroup
-    , errors : List Error
     , transactionDateRange : DateRange
     , currentTime : Posix
     , currentZone : Zone
@@ -104,7 +103,7 @@ type alias TransactionDetail =
 
 type Transaction
     = Success (List TransactionDetail)
-    | TransactionError Error
+    | TransactionError PlaidError
     | UnknownTransactionStatus
 
 
@@ -130,27 +129,6 @@ type alias BudgetItem =
     }
 
 
-type ErrorCode
-    = ItemLoginRequired
-    | UnknownError
-
-
-type alias Error =
-    { code : ErrorCode
-    , message : String
-    }
-
-
-errorCodeFromString : String -> ErrorCode
-errorCodeFromString str =
-    case str of
-        "ITEM_LOGIN_REQUIRED" ->
-            ItemLoginRequired
-
-        _ ->
-            UnknownError
-
-
 transactionDecoder : Decode.Decoder Transaction
 transactionDecoder =
     Decode.oneOf
@@ -162,19 +140,9 @@ transactionDecoder =
         ]
 
 
-transactionErrorDecoder : Decode.Decoder Error
+transactionErrorDecoder : Decode.Decoder PlaidError
 transactionErrorDecoder =
-    Decode.at [ "error", "code" ] Decode.string
-        |> Decode.andThen
-            (\str ->
-                let
-                    code =
-                        errorCodeFromString str
-                in
-                Decode.succeed Error
-                    |> hardcoded code
-                    |> requiredAt [ "error", "message" ] Decode.string
-            )
+    plaidErrorDecoder
 
 
 transactionDetailDecoder : Decode.Decoder TransactionDetail
@@ -227,24 +195,6 @@ budgetItemDecoder categories =
         |> required "plannedSpending" Decode.float
         |> required "categoryId" Decode.string
         |> resolve
-
-
-errorDecoder : Decode.Decoder Error
-errorDecoder =
-    Decode.oneOf
-        [ Decode.field "code" Decode.string
-        , Decode.at [ "error", "code" ] Decode.string
-        ]
-        |> Decode.andThen
-            (\str ->
-                let
-                    code =
-                        errorCodeFromString str
-                in
-                Decode.succeed Error
-                    |> hardcoded code
-                    |> required "message" Decode.string
-            )
 
 
 
@@ -532,22 +482,6 @@ transactionAmount transaction =
 -- View
 
 
-accountsPane : List Session.Account -> Html Msg
-accountsPane accounts =
-    div []
-        [ Button.primary [ onClick StartLink ] [ text "Add account" ]
-        , div [] <|
-            List.map
-                (\account ->
-                    div []
-                        [ text account.name
-                        , text <| "(" ++ account.institutionName ++ ")"
-                        ]
-                )
-                accounts
-        ]
-
-
 transactionDetailsView : TransactionDetail -> Html Msg
 transactionDetailsView transaction =
     div [ css Style.transactionDetail ]
@@ -739,6 +673,26 @@ snapshotView model =
         ]
 
 
+accountsPane : Model -> Html Msg
+accountsPane model =
+    let
+        itemAccounts =
+            Session.getItemAccounts model.session
+    in
+    -- div [] <|
+    --     List.map
+    --         (\itemAccount ->
+    --             div []
+    --                 [ span [] [ itemAccount.name ]
+    --                 , span [] [ text " " ]
+    --                 , span []
+    --                     []
+    --                 ]
+    --         )
+    --         itemAccounts
+    div [] []
+
+
 view : Model -> Html Msg
 view model =
     case model.session of
@@ -749,11 +703,11 @@ view model =
             div [ css Style.budgetContainer ]
                 [ div []
                     [ Button.primary [ onClick StartLink ] [ text "Add account" ] ]
+                , accountsPane model
                 , snapshotView model
                 , transactionsPane model
 
                 -- budgetGroupListView model
-                -- , accountsPane data.accounts
                 ]
 
 

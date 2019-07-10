@@ -1,6 +1,14 @@
 import { Elm } from '../app/Main.elm';
 import { startAuth } from './auth';
 
+if (module && module.hot) {
+  window.onerror = (err) => {
+    if (/Error: \[elm-hot\]/.test(err)) {
+      window.location.reload();
+    }
+  }
+}
+
 const app = Elm.Main.init({
   node: document.getElementById('root'),
   flags: localStorage.getItem('accessToken') || null

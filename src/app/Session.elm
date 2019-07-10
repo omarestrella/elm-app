@@ -1,10 +1,11 @@
-module Session exposing (Account, Item, Session(..), SessionData, User, accessToken, accountTokens, addAccountsToSession, addItemToUser, decoder, encode, getSession, linkItemToUser, loadAccounts, navKey, userDecoder)
+module Session exposing (Account, Item, Session(..), SessionData, User, accessToken, accountTokens, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, navKey, userDecoder)
 
 import Api exposing (Method(..))
 import Browser.Navigation as Navigation
+import Error exposing (PlaidError, plaidErrorDecoder)
 import Http
 import Json.Decode as Decode exposing (field, int, list, string)
-import Json.Decode.Pipeline exposing (hardcoded, optional, required)
+import Json.Decode.Pipeline exposing (hardcoded, optional, required, requiredAt)
 import Json.Encode as Encode
 import Link exposing (Link)
 import Url.Builder as Builder exposing (Root(..))
@@ -61,7 +62,7 @@ type AccountType
     | UnknownAccountType
 
 
-type alias Account =
+type alias AccountDetail =
     { accountId : String
     , balances : Maybe Balance
     , name : String
@@ -71,6 +72,11 @@ type alias Account =
     , subtype : String
     , institutionName : String
     }
+
+
+type Account
+    = AccountSuccess AccountDetail
+    | AccountError String PlaidError
 
 
 type alias SessionData =
@@ -181,6 +187,57 @@ groupedAccounts session =
 
         LoggedIn _ data ->
             []
+
+
+allItems : Session -> List Item
+allItems session =
+    case session of
+        Guest _ ->
+            []
+
+        LoggedIn _ data ->
+            data.user.items
+
+
+itemForAccessToken : Session -> String -> Maybe Item
+itemForAccessToken session token =
+    let
+        items =
+            allItems session
+    in
+    List.filter (\item -> item.accessToken == token) items
+        |> List.head
+
+
+accountForAccessToken : Session -> String -> Maybe Account
+accountForAccessToken session token =
+    let
+        accounts =
+            allAccounts session
+    in
+    Nothing
+
+
+itemAccountsForAccessToken : Session -> String -> List ItemAccount
+itemAccountsForAccessToken session token =
+    Maybe.withDefault []
+        (itemForAccessToken session token
+            |> Maybe.andThen (\item -> Just item.accounts)
+        )
+
+
+
+-- Account Helpers
+
+
+getItemAccounts : Session -> List ItemAccount
+getItemAccounts session =
+    let
+        accessTokens =
+            accountTokens session
+    in
+    List.concatMap (\token -> itemAccountsForAccessToken session token)
+        accessTokens
 
 
 
@@ -317,10 +374,27 @@ balanceDecoder =
 
 accountDecoder : Decode.Decoder Account
 accountDecoder =
+    Decode.oneOf
+        [ accountDetailDecoder |> Decode.map AccountSuccess
+        , accountErrorDecoder
+        ]
+
+
+accountErrorDecoder : Decode.Decoder Account
+accountErrorDecoder =
+    Decode.field "token" Decode.string
+        |> Decode.andThen
+            (\token ->
+                plaidErrorDecoder |> Decode.map (AccountError token)
+            )
+
+
+accountDetailDecoder : Decode.Decoder AccountDetail
+accountDetailDecoder =
     Decode.field "type" Decode.string
         |> Decode.andThen
             (\type_ ->
-                Decode.succeed Account
+                Decode.succeed AccountDetail
                     |> required "account_id" Decode.string
                     |> optional "balances" (Decode.maybe balanceDecoder) Nothing
                     |> required "name" Decode.string

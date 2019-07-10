@@ -2,8 +2,8 @@ port module Main exposing (Model, Msg(..), init, main, subscriptions, update, up
 
 import Browser exposing (Document, UrlRequest(..))
 import Browser.Navigation as Navigation
-import Html.Styled exposing (Html, a, button, div, form, h1, img, input, label, map, text, toUnstyled)
-import Html.Styled.Attributes exposing (href, id, src, type_)
+import Html.Styled exposing (Html, a, button, div, form, h1, img, input, label, map, span, text, toUnstyled)
+import Html.Styled.Attributes exposing (css, href, id, src, type_)
 import Html.Styled.Events exposing (onClick, onSubmit)
 import Http
 import Json.Decode as Decode
@@ -14,6 +14,7 @@ import Page.Auth as Auth
 import Page.Dashboard as Dashboard
 import Routing exposing (..)
 import Session exposing (Session(..), SessionData, getSession)
+import Style.Main as Style
 import Task
 import Time exposing (Zone)
 import Url exposing (Url)
@@ -282,9 +283,11 @@ pageView model =
 
 navbarView : Route -> Html Msg
 navbarView route =
-    div []
-        [ Routing.routeLink "Dashboard" (routeHandler DashboardRoute)
-        , Routing.routeLink "Login/Register" (routeHandler AuthRoute)
+    div [ css Style.navbar ]
+        [ span [ css Style.navbarEntry ]
+            [ Routing.routeLink "Dashboard" (routeHandler DashboardRoute) ]
+        , span [ css Style.navbarEntry ]
+            [ Routing.routeLink "Login/Register" (routeHandler AuthRoute) ]
         ]
 
 
