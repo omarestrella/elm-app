@@ -140,6 +140,7 @@ update msg model =
                                         { accessToken = token
                                         , user = user
                                         , accounts = []
+                                        , linkResponse = NoLink
                                         }
 
                                 appModel =

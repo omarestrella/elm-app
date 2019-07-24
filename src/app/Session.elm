@@ -1,13 +1,17 @@
-module Session exposing (Account(..), Item, Msg, Session(..), SessionData, User, accessToken, accountTokens, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, navKey, update, userDecoder)
+port module Session exposing (Account(..), Item, Msg, Session(..), SessionData, User, accessToken, accountTokens, addAccountView, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, navKey, subscriptions, update, userDecoder)
 
 import Api exposing (Method(..))
 import Browser.Navigation as Navigation
+import Component.Button as Button
 import Error exposing (PlaidError, plaidErrorDecoder)
+import Html.Styled exposing (Html, div, text)
+import Html.Styled.Attributes
+import Html.Styled.Events exposing (onClick)
 import Http
 import Json.Decode as Decode exposing (field, int, list, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required, requiredAt)
 import Json.Encode as Encode
-import Link exposing (Link)
+import Link exposing (Link, LinkResponse(..), linkResponseDecoder)
 import Url.Builder exposing (Root(..))
 
 
@@ -83,11 +87,15 @@ type alias SessionData =
     { user : User
     , accessToken : String
     , accounts : List Account
+    , linkResponse : LinkResponse
     }
 
 
 type Msg
     = GotAccounts (Result Http.Error (List Account))
+    | StartLink
+    | LinkResponseMsg (Result Decode.Error LinkResponse)
+    | HandleItemLink (Result Http.Error Item)
 
 
 update : Msg -> Session -> ( Session, Cmd Msg )
@@ -99,6 +107,43 @@ update msg session =
                     ( addAccountsToSession session accounts, Cmd.none )
 
                 Err err ->
+                    ( session, Cmd.none )
+
+        StartLink ->
+            ( session, plaidLink "StartLink" )
+
+        LinkResponseMsg response ->
+            let
+                token =
+                    accessToken session
+            in
+            case response of
+                Ok linkData ->
+                    case linkData of
+                        LinkSuccess link ->
+                            ( session
+                            , linkItemToUser HandleItemLink token link
+                            )
+
+                        LinkError errors ->
+                            -- MARK: graceful error handling
+                            ( session, Cmd.none )
+
+                        NoLink ->
+                            ( session, Cmd.none )
+
+                Err _ ->
+                    -- MARK: graceful error handling
+                    ( session, Cmd.none )
+
+        HandleItemLink response ->
+            case response of
+                Ok item ->
+                    ( addItemToUser session item
+                    , Cmd.none
+                    )
+
+                Err _ ->
                     ( session, Cmd.none )
 
 
@@ -416,3 +461,31 @@ accountDetailDecoder =
 decoder : Decode.Decoder User
 decoder =
     Decode.at [ "user" ] userDecoder
+
+
+
+-- Views
+
+
+addAccountView : Html Msg
+addAccountView =
+    div []
+        [ Button.primary [ onClick StartLink ] [ text "Add account" ] ]
+
+
+
+-- Subscriptions
+
+
+port linkResponse : (Decode.Value -> msg) -> Sub msg
+
+
+port plaidLink : String -> Cmd msg
+
+
+subscriptions : Sub Msg
+subscriptions =
+    linkResponse
+        (\value ->
+            LinkResponseMsg (Decode.decodeValue linkResponseDecoder value)
+        )

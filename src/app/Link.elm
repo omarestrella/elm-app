@@ -12,6 +12,7 @@ type alias Error =
 type LinkResponse
     = LinkSuccess Link
     | LinkError (List Error)
+    | NoLink
 
 
 type alias LinkSuccessResponse =

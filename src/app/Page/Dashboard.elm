@@ -1,4 +1,4 @@
-port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, linkResponse, routeHandler, subscriptions, update, view)
+port module Page.Dashboard exposing (Model, Msg, bootstrap, defaultModel, routeHandler, subscriptions, update, view)
 
 import Api exposing (ApiEnvironment(..), Method(..))
 import Component.Button as Button
@@ -7,7 +7,7 @@ import Component.Input as Input
 import DateFormat.Relative exposing (relativeTime)
 import Dates exposing (DateRange(..), dateRangeToQuery, dateRangeToString, dateSelector, formattedTransactionGroupDate, stringToDateRange)
 import Error exposing (PlaidError, plaidErrorDecoder)
-import Html.Styled exposing (Html, a, button, div, form, fromUnstyled, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Styled exposing (Html, map, a, button, div, form, fromUnstyled, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
@@ -15,7 +15,6 @@ import Http.Detailed
 import Json.Decode as Decode
 import Json.Decode.Pipeline exposing (hardcoded, optional, required, requiredAt, resolve)
 import Json.Encode as Encode
-import Link exposing (LinkResponse(..), linkResponseDecoder)
 import List.Extra exposing (groupWhile)
 import Money exposing (currencyCodeToSymbol, stringToCurrencyCode)
 import Round exposing (round)
@@ -27,16 +26,12 @@ import Time exposing (Posix, Zone)
 
 type Msg
     = NoOp
-    | StartLink
-    | LinkResponseMsg (Result Decode.Error LinkResponse)
-    | HandleItemLink (Result Http.Error Session.Item)
     | LoadData
     | LoadTransactionsForTime String (List String) Posix
     | UpdateBudgetGroup String
     | ClearBudgetGroup
     | SubmitNewBudgetGroup String
     | PerformCategorySearch String
-      -- | GotAccounts (Result Http.Error (List Session.Account))
     | GotCategories (Result Http.Error (List Category))
     | GotTransactions (Result (Http.Detailed.Error String) ( List Transaction, Http.Metadata ))
     | ChangeDateRange String
@@ -67,7 +62,6 @@ defaultUser =
 
 defaultModel session =
     { environment = Sandbox
-    , linkResponse = LinkError []
     , session = session
     , transactions = []
     , categories = Default []
@@ -81,7 +75,6 @@ defaultModel session =
 
 type alias Model =
     { environment : ApiEnvironment
-    , linkResponse : LinkResponse
     , session : Session
     , transactions : List Transaction
     , categories : CategoryState
@@ -241,42 +234,6 @@ routeHandler =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        StartLink ->
-            ( model, plaidLink "StartLink" )
-
-        LinkResponseMsg response ->
-            let
-                token =
-                    Session.accessToken model.session
-            in
-            case response of
-                Ok linkData ->
-                    case linkData of
-                        LinkSuccess link ->
-                            ( model
-                            , Session.linkItemToUser HandleItemLink token link
-                            )
-
-                        LinkError errors ->
-                            -- MARK: graceful error handling
-                            ( model, Cmd.none )
-
-                Err _ ->
-                    -- MARK: graceful error handling
-                    ( model, Cmd.none )
-
-        HandleItemLink response ->
-            case response of
-                Ok item ->
-                    ( { model
-                        | session = Session.addItemToUser model.session item
-                      }
-                    , Cmd.none
-                    )
-
-                Err _ ->
-                    ( model, Cmd.none )
-
         LoadData ->
             ( model
             , bootstrap model.session
@@ -724,6 +681,11 @@ accountsPane model =
             accounts
 
 
+addAccountView : Html Msg
+addAccountView =
+    Session.addAccountView |> map GotSessionMsg
+
+
 view : Model -> Html Msg
 view model =
     case model.session of
@@ -732,8 +694,7 @@ view model =
 
         LoggedIn _ data ->
             div [ css Style.budgetContainer ]
-                [ div []
-                    [ Button.primary [ onClick StartLink ] [ text "Add account" ] ]
+                [ addAccountView
                 , accountsPane model
                 , snapshotView model
                 , transactionsPane model
@@ -742,24 +703,15 @@ view model =
                 ]
 
 
-port plaidLink : String -> Cmd msg
-
-
 port fixLoginError : String -> Cmd msg
 
 
 port loginErrorResponse : (String -> msg) -> Sub msg
 
 
-port linkResponse : (Decode.Value -> msg) -> Sub msg
-
-
 subscriptions : Sub Msg
 subscriptions =
     Sub.batch
-        [ linkResponse
-            (\value ->
-                LinkResponseMsg (Decode.decodeValue linkResponseDecoder value)
-            )
-        , loginErrorResponse (\_ -> LoadData)
+        [ loginErrorResponse (\_ -> LoadData)
+        , Session.subscriptions |> Sub.map GotSessionMsg
         ]

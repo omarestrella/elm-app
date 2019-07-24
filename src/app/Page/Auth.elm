@@ -7,7 +7,7 @@ import Html.Styled.Events exposing (onInput, onSubmit)
 import Http
 import Json.Decode as Decode exposing (field, int, string)
 import Json.Encode as Encode
-import Link exposing (Link)
+import Link exposing (Link, LinkResponse(..))
 import LocalStorage as Storage
 import Routing exposing (Route(..), routePath)
 import Session exposing (Session(..), SessionData, decoder, navKey)
@@ -98,6 +98,7 @@ update msg model =
                                 { accessToken = loginResponse.accessToken
                                 , user = loginResponse.user
                                 , accounts = []
+                                , linkResponse = NoLink
                                 }
 
                         newModel =
