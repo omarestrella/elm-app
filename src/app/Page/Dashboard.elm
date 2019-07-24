@@ -707,6 +707,9 @@ accountsPane model =
                             [ span [] [ text "Error loading accounts " ]
                             , Button.primary [ onClick (FixAccountError token error) ] [ text "Fix!" ]
                             ]
+
+                    Session.UnknownAccountStatus ->
+                        text ""
             )
             accounts
 

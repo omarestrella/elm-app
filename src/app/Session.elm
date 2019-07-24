@@ -70,13 +70,13 @@ type alias AccountDetail =
     , officialName : Maybe String
     , type_ : AccountType
     , subtype : String
-    , institutionName : String
     }
 
 
 type Account
-    = AccountSuccess AccountDetail
+    = AccountSuccess (List AccountDetail)
     | AccountError String PlaidError
+    | UnknownAccountStatus
 
 
 type alias SessionData =
@@ -365,8 +365,10 @@ balanceDecoder =
 accountDecoder : Decode.Decoder Account
 accountDecoder =
     Decode.oneOf
-        [ accountDetailDecoder |> Decode.map AccountSuccess
-        , accountErrorDecoder
+        [ accountErrorDecoder
+        , Decode.field "accounts" (Decode.list accountDetailDecoder)
+            |> Decode.map AccountSuccess
+        , Decode.succeed UnknownAccountStatus
         ]
 
 
@@ -392,7 +394,6 @@ accountDetailDecoder =
                     |> optional "official_name" (Decode.maybe Decode.string) Nothing
                     |> hardcoded (accountTypeStringToValue type_)
                     |> required "subtype" Decode.string
-                    |> required "institution_name" Decode.string
             )
 
 
