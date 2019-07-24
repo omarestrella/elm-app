@@ -36,13 +36,14 @@ type Msg
     | ClearBudgetGroup
     | SubmitNewBudgetGroup String
     | PerformCategorySearch String
-    | GotAccounts (Result Http.Error (List Session.Account))
+      -- | GotAccounts (Result Http.Error (List Session.Account))
     | GotCategories (Result Http.Error (List Category))
     | GotTransactions (Result (Http.Detailed.Error String) ( List Transaction, Http.Metadata ))
     | ChangeDateRange String
     | GotCurrentTime Posix
     | GotCurrentZone Zone
     | FixAccountError String PlaidError
+    | GotSessionMsg Session.Msg
 
 
 type CategoryState
@@ -215,11 +216,7 @@ bootstrap session =
             List.length accountTokens > 0
 
         accountsCmd =
-            if haveAccountTokens then
-                Session.loadAccounts GotAccounts token accountTokens
-
-            else
-                Cmd.none
+            loadAccounts session
 
         transactionsCmd =
             if haveAccountTokens then
@@ -284,22 +281,6 @@ update msg model =
             ( model
             , bootstrap model.session
             )
-
-        GotAccounts response ->
-            case response of
-                Ok accounts ->
-                    let
-                        newModel =
-                            { model | session = Session.addAccountsToSession model.session accounts }
-                    in
-                    ( newModel, Cmd.none )
-
-                Err err ->
-                    let
-                        _ =
-                            Debug.log "GotAccounts Error" err
-                    in
-                    ( model, Cmd.none )
 
         GotTransactions response ->
             case response of
@@ -390,8 +371,41 @@ update msg model =
                 Error.UnknownError ->
                     ( model, Cmd.none )
 
+        GotSessionMsg sessionMsg ->
+            let
+                ( session, sessionCmd ) =
+                    Session.update sessionMsg model.session
+            in
+            Session.update sessionMsg model.session
+                |> updateSession model
+
         NoOp ->
             ( model, Cmd.none )
+
+
+updateSession : Model -> ( Session, Cmd Session.Msg ) -> ( Model, Cmd Msg )
+updateSession model ( session, cmd ) =
+    ( { model | session = session }, Cmd.map GotSessionMsg cmd )
+
+
+loadAccounts : Session -> Cmd Msg
+loadAccounts session =
+    let
+        token =
+            Session.accessToken session
+
+        accountTokens =
+            Session.accountTokens session
+
+        haveAccountTokens =
+            List.length accountTokens > 0
+    in
+    if haveAccountTokens then
+        Session.loadAccounts token accountTokens
+            |> Cmd.map GotSessionMsg
+
+    else
+        Cmd.none
 
 
 loadTransactions : String -> List String -> Int -> Int -> Cmd Msg

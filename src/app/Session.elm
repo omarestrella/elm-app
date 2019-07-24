@@ -1,4 +1,4 @@
-module Session exposing (Account(..), Item, Session(..), SessionData, User, accessToken, accountTokens, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, navKey, userDecoder)
+module Session exposing (Account(..), Item, Msg, Session(..), SessionData, User, accessToken, accountTokens, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, navKey, update, userDecoder)
 
 import Api exposing (Method(..))
 import Browser.Navigation as Navigation
@@ -86,6 +86,26 @@ type alias SessionData =
     }
 
 
+type Msg
+    = GotAccounts (Result Http.Error (List Account))
+
+
+update : Msg -> Session -> ( Session, Cmd Msg )
+update msg session =
+    case msg of
+        GotAccounts response ->
+            case response of
+                Ok accounts ->
+                    ( addAccountsToSession session accounts, Cmd.none )
+
+                Err err ->
+                    ( session, Cmd.none )
+
+
+
+-- Utils
+
+
 accountTypeStringToValue : String -> AccountType
 accountTypeStringToValue str =
     case str of
@@ -106,10 +126,6 @@ accountTypeStringToValue str =
 
         _ ->
             UnknownAccountType
-
-
-
--- Utils
 
 
 addItemToUser : Session -> Item -> Session
@@ -272,8 +288,8 @@ linkItemToUser msg token link =
         }
 
 
-loadAccounts : (Result Http.Error (List Account) -> msg) -> String -> List String -> Cmd msg
-loadAccounts msg token accessTokens =
+loadAccounts : String -> List String -> Cmd Msg
+loadAccounts token accessTokens =
     let
         url =
             Api.accessTokensUrl accessTokens "accounts"
@@ -283,7 +299,7 @@ loadAccounts msg token accessTokens =
         , accessToken = Just token
         , method = GET
         , body = Nothing
-        , handler = Http.expectJson msg (Decode.list accountDecoder)
+        , handler = Http.expectJson GotAccounts (Decode.list accountDecoder)
         }
 
 
