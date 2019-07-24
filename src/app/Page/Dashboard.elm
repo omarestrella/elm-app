@@ -372,10 +372,6 @@ update msg model =
                     ( model, Cmd.none )
 
         GotSessionMsg sessionMsg ->
-            let
-                ( session, sessionCmd ) =
-                    Session.update sessionMsg model.session
-            in
             Session.update sessionMsg model.session
                 |> updateSession model
 
