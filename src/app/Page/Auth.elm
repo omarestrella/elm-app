@@ -94,12 +94,7 @@ update msg model =
                             navKey model.session
 
                         newSession =
-                            LoggedIn key
-                                { accessToken = loginResponse.accessToken
-                                , user = loginResponse.user
-                                , accounts = []
-                                , linkResponse = NoLink
-                                }
+                            LoggedIn key (Session.makeSessionData loginResponse.accessToken loginResponse.user)
 
                         newModel =
                             { model | session = newSession }

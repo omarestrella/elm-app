@@ -1,4 +1,4 @@
-port module Session exposing (Account(..), Item, Msg, Session(..), SessionData, User, accessToken, accountTokens, addAccountView, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, navKey, subscriptions, update, userDecoder)
+port module Session exposing (Account(..), Item, Msg, Session(..), SessionData, User, accessToken, accountTokens, addAccountView, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, loadItems, makeSessionData, navKey, subscriptions, update, userDecoder)
 
 import Api exposing (Method(..))
 import Browser.Navigation as Navigation
@@ -25,7 +25,7 @@ type alias User =
     , firstName : String
     , lastName : String
     , email : String
-    , items : List Item
+    , accountTokens : List String
     }
 
 
@@ -35,6 +35,7 @@ type alias Item =
     , accessToken : String
     , publicToken : String
     , accounts : List ItemAccount
+    , institutionName : String
     }
 
 
@@ -78,7 +79,7 @@ type alias AccountDetail =
 
 
 type Account
-    = AccountSuccess (List AccountDetail)
+    = AccountSuccess String (List AccountDetail)
     | AccountError String PlaidError
     | UnknownAccountStatus
 
@@ -87,15 +88,27 @@ type alias SessionData =
     { user : User
     , accessToken : String
     , accounts : List Account
+    , items : List Item
     , linkResponse : LinkResponse
     }
 
 
 type Msg
     = GotAccounts (Result Http.Error (List Account))
+    | GotItems (Result Http.Error (List Item))
     | StartLink
     | LinkResponseMsg (Result Decode.Error LinkResponse)
     | HandleItemLink (Result Http.Error Item)
+
+
+makeSessionData : String -> User -> SessionData
+makeSessionData token user =
+    { accessToken = token
+    , user = user
+    , accounts = []
+    , items = []
+    , linkResponse = NoLink
+    }
 
 
 update : Msg -> Session -> ( Session, Cmd Msg )
@@ -107,6 +120,14 @@ update msg session =
                     ( addAccountsToSession session accounts, Cmd.none )
 
                 Err err ->
+                    ( session, Cmd.none )
+
+        GotItems response ->
+            case response of
+                Ok items ->
+                    ( addItemsToSession session items, Cmd.none )
+
+                Err _ ->
                     ( session, Cmd.none )
 
         StartLink ->
@@ -180,14 +201,17 @@ addItemToUser session item =
             session
 
         LoggedIn key sessionData ->
-            let
-                user =
-                    sessionData.user
+            LoggedIn key { sessionData | items = item :: sessionData.items }
 
-                updatedUser =
-                    { user | items = user.items ++ [ item ] }
-            in
-            LoggedIn key { sessionData | user = updatedUser }
+
+addItemsToSession : Session -> List Item -> Session
+addItemsToSession session items =
+    case session of
+        Guest _ ->
+            session
+
+        LoggedIn key data ->
+            LoggedIn key { data | items = data.items ++ items }
 
 
 addAccountsToSession : Session -> List Account -> Session
@@ -227,7 +251,7 @@ accountTokens session =
             []
 
         LoggedIn _ data ->
-            List.map .accessToken data.user.items
+            data.user.accountTokens
 
 
 allAccounts : Session -> List Account
@@ -247,7 +271,7 @@ allItems session =
             []
 
         LoggedIn _ data ->
-            data.user.items
+            data.items
 
 
 itemForAccessToken : Session -> String -> Maybe Item
@@ -348,6 +372,17 @@ loadAccounts token accessTokens =
         }
 
 
+loadItems : String -> Cmd Msg
+loadItems token =
+    Api.request
+        { url = "/items"
+        , accessToken = Just token
+        , method = GET
+        , body = Nothing
+        , handler = Http.expectJson GotItems (Decode.list itemDecoder)
+        }
+
+
 
 -- Encoders/Decoders
 
@@ -377,7 +412,7 @@ encode session =
                                             , ( "accessToken", Encode.string item.accessToken )
                                             ]
                                     )
-                                    data.user.items
+                                    data.items
                               )
                             ]
                       )
@@ -391,7 +426,7 @@ userDecoder =
         |> required "firstName" string
         |> required "lastName" string
         |> required "email" string
-        |> required "items" (list itemDecoder)
+        |> required "tokens" (list (Decode.field "accessToken" string))
 
 
 itemDecoder : Decode.Decoder Item
@@ -402,6 +437,7 @@ itemDecoder =
         |> required "accessToken" string
         |> required "publicToken" string
         |> required "accounts" (list itemAccountDecoder)
+        |> required "institutionName" string
 
 
 itemAccountDecoder : Decode.Decoder ItemAccount
@@ -427,8 +463,12 @@ accountDecoder : Decode.Decoder Account
 accountDecoder =
     Decode.oneOf
         [ accountErrorDecoder
-        , Decode.field "accounts" (Decode.list accountDetailDecoder)
-            |> Decode.map AccountSuccess
+        , Decode.field "token" Decode.string
+            |> Decode.andThen
+                (\token ->
+                    Decode.field "accounts" (Decode.list accountDetailDecoder)
+                        |> Decode.map (AccountSuccess token)
+                )
         , Decode.succeed UnknownAccountStatus
         ]
 

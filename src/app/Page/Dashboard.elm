@@ -7,7 +7,7 @@ import Component.Input as Input
 import DateFormat.Relative exposing (relativeTime)
 import Dates exposing (DateRange(..), dateRangeToQuery, dateRangeToString, dateSelector, formattedTransactionGroupDate, stringToDateRange)
 import Error exposing (PlaidError, plaidErrorDecoder)
-import Html.Styled exposing (Html, map, a, button, div, form, fromUnstyled, h4, h5, h6, input, label, li, option, select, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Styled exposing (Html, a, button, div, form, fromUnstyled, h4, h5, h6, input, label, li, map, option, select, span, table, tbody, td, text, th, thead, tr, ul)
 import Html.Styled.Attributes exposing (class, css, href, id, placeholder, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
@@ -209,7 +209,10 @@ bootstrap session =
             List.length accountTokens > 0
 
         accountsCmd =
-            loadAccounts session
+            Cmd.batch
+                [ loadAccounts session
+                , loadItems session
+                ]
 
         transactionsCmd =
             if haveAccountTokens then
@@ -356,6 +359,22 @@ loadAccounts session =
     if haveAccountTokens then
         Session.loadAccounts token accountTokens
             |> Cmd.map GotSessionMsg
+
+    else
+        Cmd.none
+
+
+loadItems : Session -> Cmd Msg
+loadItems session =
+    let
+        token =
+            Session.accessToken session
+
+        haveToken =
+            token /= ""
+    in
+    if haveToken then
+        Session.loadItems token |> Cmd.map GotSessionMsg
 
     else
         Cmd.none
@@ -666,7 +685,7 @@ accountsPane model =
         List.map
             (\account ->
                 case account of
-                    Session.AccountSuccess accountDetail ->
+                    Session.AccountSuccess token accountDetail ->
                         div [] [ text "account!" ]
 
                     Session.AccountError token error ->
@@ -693,13 +712,17 @@ view model =
             text "Guest Home"
 
         LoggedIn _ data ->
-            div [ css Style.budgetContainer ]
-                [ addAccountView
-                , accountsPane model
-                , snapshotView model
-                , transactionsPane model
+            div [ css Style.dashboardContainer ]
+                [ div [ css Style.budgetContainer ]
+                    [ snapshotView model
+                    , transactionsPane model
 
-                -- budgetGroupListView model
+                    -- budgetGroupListView model
+                    ]
+                , div [ css Style.accountsContainer ]
+                    [ addAccountView
+                    , accountsPane model
+                    ]
                 ]
 
 

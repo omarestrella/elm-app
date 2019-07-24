@@ -136,12 +136,7 @@ update msg model =
                         Ok user ->
                             let
                                 authSession =
-                                    LoggedIn key
-                                        { accessToken = token
-                                        , user = user
-                                        , accounts = []
-                                        , linkResponse = NoLink
-                                        }
+                                    LoggedIn key (Session.makeSessionData token user)
 
                                 appModel =
                                     { currentRoute = DashboardRoute
@@ -151,7 +146,7 @@ update msg model =
                                     }
 
                                 accountTokens =
-                                    List.map .accessToken user.items
+                                    Session.accountTokens authSession
                             in
                             ( Ready appModel
                             , Cmd.batch

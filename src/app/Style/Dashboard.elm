@@ -1,4 +1,4 @@
-module Style.Dashboard exposing (addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, columnDisplay, snapshotBalance, snapshotChart, snapshotContainer, snapshotEntry, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending, transactionDetail, transactionDetailAmount, transactionDetailAmountColor, transactionDetailCategory, transactionDetailName, transactionDetailNameCategory, transactionGroup, transactionGroupDetail, transactionGroupTitle)
+module Style.Dashboard exposing (accountsContainer, addNewBudgetGroup, budgetContainer, budgetGroupContainer, budgetGroupList, columnDisplay, dashboardContainer, snapshotBalance, snapshotChart, snapshotContainer, snapshotEntry, snapshotEntryContainer, snapshotEntryHeading, snapshotEntryValue, snapshotIncomeSpending, transactionDetail, transactionDetailAmount, transactionDetailAmountColor, transactionDetailCategory, transactionDetailName, transactionDetailNameCategory, transactionGroup, transactionGroupDetail, transactionGroupTitle)
 
 import Css exposing (..)
 import Css.Media exposing (maxWidth, only, screen, withMedia)
@@ -10,13 +10,26 @@ columnDisplay =
     ]
 
 
+dashboardContainer =
+    [ displayFlex
+    , padding (px 20)
+    ]
+
+
 budgetContainer =
     [ displayFlex
     , flexDirection column
-    , padding (px 20)
     , width (pct 60)
-    , withMedia [ only screen [ maxWidth (px 600) ] ]
-        [ width (pct 100) ]
+    , paddingRight (px 10)
+    , withMedia [ only screen [ maxWidth (px 600) ] ] []
+
+    -- [ width (pct 100) ]
+    ]
+
+
+accountsContainer =
+    [ flex (int 1)
+    , paddingLeft (px 10)
     ]
 
 
