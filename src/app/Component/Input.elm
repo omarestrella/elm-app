@@ -6,5 +6,5 @@ import Html.Styled.Attributes exposing (class)
 
 default : List (Attribute msg) -> List (Html msg) -> Html msg
 default attrs html =
-    input ([ class "form-control" ] ++ attrs)
+    input (class "form-control" :: attrs)
         html

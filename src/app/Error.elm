@@ -1,7 +1,7 @@
 module Error exposing (ErrorCode(..), PlaidError, plaidErrorDecoder)
 
-import Json.Decode as Decode exposing (field, int, list, string)
-import Json.Decode.Pipeline exposing (hardcoded, optional, required, requiredAt)
+import Json.Decode as Decode exposing (string)
+import Json.Decode.Pipeline exposing (hardcoded, requiredAt)
 
 
 type ErrorCode

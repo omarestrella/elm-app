@@ -1,4 +1,4 @@
-module Session exposing (Account, Item, Session(..), SessionData, User, accessToken, accountTokens, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, navKey, userDecoder)
+module Session exposing (Account(..), Item, Session(..), SessionData, User, accessToken, accountTokens, addAccountsToSession, addItemToUser, allAccounts, decoder, encode, getItemAccounts, getSession, linkItemToUser, loadAccounts, navKey, userDecoder)
 
 import Api exposing (Method(..))
 import Browser.Navigation as Navigation
@@ -8,7 +8,7 @@ import Json.Decode as Decode exposing (field, int, list, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required, requiredAt)
 import Json.Encode as Encode
 import Link exposing (Link)
-import Url.Builder as Builder exposing (Root(..))
+import Url.Builder exposing (Root(..))
 
 
 type Session
@@ -126,7 +126,7 @@ addItemToUser session item =
                 updatedUser =
                     { user | items = user.items ++ [ item ] }
             in
-            LoggedIn key { sessionData | user = user }
+            LoggedIn key { sessionData | user = updatedUser }
 
 
 addAccountsToSession : Session -> List Account -> Session
@@ -177,16 +177,6 @@ allAccounts session =
 
         LoggedIn _ data ->
             data.accounts
-
-
-groupedAccounts : Session -> List ( AccountType, List Account )
-groupedAccounts session =
-    case session of
-        Guest _ ->
-            []
-
-        LoggedIn _ data ->
-            []
 
 
 allItems : Session -> List Item

@@ -1,8 +1,8 @@
 module Api exposing (ApiEnvironment(..), Method(..), RequestOptions, accessTokensUrl, dateRangeUrl, methodString, request, url)
 
-import Dates exposing (DateRange(..), dateRangeToString)
+import Dates exposing (DateRange(..))
 import Http
-import Json.Decode as Decode exposing (field, int, string)
+import Json.Decode exposing (int, string)
 import Url.Builder as Builder
 
 

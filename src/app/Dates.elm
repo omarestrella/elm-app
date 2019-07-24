@@ -4,12 +4,11 @@ import DateFormat
 import Derberos.Date.Calendar as Calendar
 import Derberos.Date.Core as Core
 import Derberos.Date.Delta as Delta
-import Derberos.Date.Utils as Utils
 import Html.Styled exposing (Html, option, select, text)
 import Html.Styled.Attributes exposing (value)
 import Html.Styled.Events exposing (onInput)
 import Iso8601
-import Time exposing (Month(..), Posix, Zone)
+import Time exposing (Month(..), Posix)
 
 
 type DateRange

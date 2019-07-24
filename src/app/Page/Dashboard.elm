@@ -42,6 +42,7 @@ type Msg
     | ChangeDateRange String
     | GotCurrentTime Posix
     | GotCurrentZone Zone
+    | FixAccountError String PlaidError
 
 
 type CategoryState
@@ -293,7 +294,11 @@ update msg model =
                     in
                     ( newModel, Cmd.none )
 
-                Err _ ->
+                Err err ->
+                    let
+                        _ =
+                            Debug.log "GotAccounts Error" err
+                    in
                     ( model, Cmd.none )
 
         GotTransactions response ->
@@ -376,6 +381,14 @@ update msg model =
 
         GotCurrentZone zone ->
             ( { model | currentZone = zone }, Cmd.none )
+
+        FixAccountError token error ->
+            case error.code of
+                Error.ItemLoginRequired ->
+                    ( model, fixLoginError token )
+
+                Error.UnknownError ->
+                    ( model, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -678,19 +691,24 @@ accountsPane model =
     let
         itemAccounts =
             Session.getItemAccounts model.session
+
+        accounts =
+            Session.allAccounts model.session
     in
-    -- div [] <|
-    --     List.map
-    --         (\itemAccount ->
-    --             div []
-    --                 [ span [] [ itemAccount.name ]
-    --                 , span [] [ text " " ]
-    --                 , span []
-    --                     []
-    --                 ]
-    --         )
-    --         itemAccounts
-    div [] []
+    div [] <|
+        List.map
+            (\account ->
+                case account of
+                    Session.AccountSuccess accountDetail ->
+                        div [] [ text "account!" ]
+
+                    Session.AccountError token error ->
+                        div []
+                            [ span [] [ text "Error loading accounts " ]
+                            , Button.primary [ onClick (FixAccountError token error) ] [ text "Fix!" ]
+                            ]
+            )
+            accounts
 
 
 view : Model -> Html Msg
@@ -714,12 +732,21 @@ view model =
 port plaidLink : String -> Cmd msg
 
 
+port fixLoginError : String -> Cmd msg
+
+
+port loginErrorResponse : (String -> msg) -> Sub msg
+
+
 port linkResponse : (Decode.Value -> msg) -> Sub msg
 
 
 subscriptions : Sub Msg
 subscriptions =
-    linkResponse
-        (\value ->
-            LinkResponseMsg (Decode.decodeValue linkResponseDecoder value)
-        )
+    Sub.batch
+        [ linkResponse
+            (\value ->
+                LinkResponseMsg (Decode.decodeValue linkResponseDecoder value)
+            )
+        , loginErrorResponse (\_ -> LoadData)
+        ]
